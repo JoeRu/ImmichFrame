@@ -58,7 +58,7 @@
         "00000000-0000-0000-0000-000000000001"
       ],
       "ShowVideos": true,
-      "ShowVideosOnly": true
+      "ShowVideosOnly": false
     },
     {
       "ImmichServerUrl": "Account2.ImmichServerUrl_TEST",
