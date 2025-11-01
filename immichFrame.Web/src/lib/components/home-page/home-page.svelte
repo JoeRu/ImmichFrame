@@ -184,6 +184,12 @@
 		imagesState = await loadImages(next);
 	}
 
+	const handleVideoEnd = async () => {
+		// Automatically advance to next asset when video ends
+		await handleDone(false, true);
+		infoVisible = false;
+	};
+
 	async function getPreviousAssets() {
 		if (!assetHistory || assetHistory.length < 1) {
 			return;
@@ -266,7 +272,21 @@
 	}
 
 	async function loadImage(assetResponse: api.AssetResponseDto) {
-		let req = await api.getImage(assetResponse.id, { clientIdentifier: $clientIdentifierStore });
+		let url: string;
+		
+		// Handle videos differently than images
+		if (assetResponse.type === 1) { // AssetTypeEnum.VIDEO = 1
+			// For videos, create a direct URL to stream the video
+			url = `/api/Asset/${assetResponse.id}/Image?clientIdentifier=${encodeURIComponent($clientIdentifierStore)}`;
+		} else {
+			// For images, use the existing blob approach
+			let req = await api.getImage(assetResponse.id, { clientIdentifier: $clientIdentifierStore });
+			if (req.status != 200) {
+				return ['', assetResponse, []] as [string, api.AssetResponseDto, api.AlbumResponseDto[]];
+			}
+			url = getImageUrl(req.data);
+		}
+
 		let album: api.AlbumResponseDto[] | null = null;
 		if ($configStore.showAlbumName) {
 			let albumReq = await api.getAlbumInfo(assetResponse.id, {
@@ -275,7 +295,7 @@
 			album = albumReq.data;
 		}
 
-		if (req.status != 200 || ($configStore.showAlbumName && album == null)) {
+		if ($configStore.showAlbumName && album == null) {
 			return ['', assetResponse, []] as [string, api.AssetResponseDto, api.AlbumResponseDto[]];
 		}
 
@@ -288,7 +308,7 @@
 			// assetResponse.exifInfo = assetInfoRequest.data.exifInfo;
 		}
 
-		return [getImageUrl(req.data), assetResponse, album] as [
+		return [url, assetResponse, album] as [
 			string,
 			api.AssetResponseDto,
 			api.AlbumResponseDto[]
@@ -362,6 +382,7 @@
 				imageZoom={$configStore.imageZoom}
 				imagePan={$configStore.imagePan}
 				bind:showInfo={infoVisible}
+				onVideoEnd={handleVideoEnd}
 			/>
 		</div>
 

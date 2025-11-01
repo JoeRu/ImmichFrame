@@ -29,8 +29,16 @@ public abstract class CachingApiAssetsPool(IApiCache apiCache, ImmichApi immichA
 
     protected async Task<IEnumerable<AssetResponseDto>> ApplyAccountFilters(Task<IEnumerable<AssetResponseDto>> unfiltered)
     {
-        // Display only Images
-        var assets = (await unfiltered).Where(x => x.Type == AssetTypeEnum.IMAGE);
+        // Filter by asset type based on account settings
+        var assets = (await unfiltered).Where(x => 
+        {
+            if (accountSettings.ShowVideosOnly)
+                return x.Type == AssetTypeEnum.VIDEO;
+            else if (accountSettings.ShowVideos)
+                return x.Type == AssetTypeEnum.IMAGE || x.Type == AssetTypeEnum.VIDEO;
+            else
+                return x.Type == AssetTypeEnum.IMAGE;
+        });
 
         if (!accountSettings.ShowArchived)
             assets = assets.Where(x => x.IsArchived == false);

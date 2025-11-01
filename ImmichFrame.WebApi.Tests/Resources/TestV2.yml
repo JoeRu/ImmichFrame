@@ -35,6 +35,7 @@ General:
   ImageFill: true
   Layout: Layout_TEST
   ChronologicalImagesCount: 7
+  VideoDuration: 7
 Accounts:
 - ImmichServerUrl: Account1.ImmichServerUrl_TEST
   ApiKey: Account1.ApiKey_TEST
@@ -51,6 +52,8 @@ Accounts:
   - 00000000-0000-0000-0000-000000000001
   People:
   - 00000000-0000-0000-0000-000000000001
+  ShowVideos: true
+  ShowVideosOnly: true
 - ImmichServerUrl: Account2.ImmichServerUrl_TEST
   ApiKey: Account2.ApiKey_TEST
   ImagesFromDate: '2020-01-02'
@@ -66,3 +69,5 @@ Accounts:
   - 00000000-0000-0000-0000-000000000001
   People:
   - 00000000-0000-0000-0000-000000000001
+  ShowVideos: true
+  ShowVideosOnly: true

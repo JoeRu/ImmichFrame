@@ -60,18 +60,18 @@ namespace ImmichFrame.WebApi.Controllers
         }
 
         [HttpGet("{id}/Image", Name = "GetImage")]
-        [Produces("image/jpeg", "image/webp")]
+        [Produces("image/jpeg", "image/webp", "video/mp4", "video/webm", "video/ogg", "video/avi", "video/mov")]
         [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
         public async Task<FileResult> GetImage(Guid id, string clientIdentifier = "")
         {
             var sanitizedClientIdentifier = clientIdentifier.SanitizeString();
-            _logger.LogDebug("Image '{id}' requested by '{sanitizedClientIdentifier}'", id, sanitizedClientIdentifier);
-            var image = await _logic.GetImage(id);
+            _logger.LogDebug("Asset '{id}' (image/video) requested by '{sanitizedClientIdentifier}'", id, sanitizedClientIdentifier);
+            var asset = await _logic.GetImage(id);
 
             var notification = new ImageRequestedNotification(id, sanitizedClientIdentifier);
             _ = _logic.SendWebhookNotification(notification);
 
-            return File(image.fileStream, image.ContentType, image.fileName); // returns a FileStreamResult
+            return File(asset.fileStream, asset.ContentType, asset.fileName); // returns a FileStreamResult
         }
 
         [HttpGet("RandomImageAndInfo", Name = "GetRandomImageAndInfo")]

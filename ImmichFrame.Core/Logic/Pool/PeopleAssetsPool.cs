@@ -21,7 +21,8 @@ public class PersonAssetsPool(IApiCache apiCache, ImmichApi immichApi, IAccountS
                     Page = page,
                     Size = batchSize,
                     PersonIds = [personId],
-                    Type = AssetTypeEnum.IMAGE,
+                    Type = accountSettings.ShowVideosOnly ? AssetTypeEnum.VIDEO : 
+                           accountSettings.ShowVideos ? null : AssetTypeEnum.IMAGE,
                     WithExif = true,
                     WithPeople = true
                 };

@@ -160,6 +160,19 @@ namespace ImmichFrame.WebApi.Tests.Controllers
                     Content = new StringContent(jsonResponse)
                 });
 
+            // Setup for GetAssetInfoAsync (new requirement for GetImage method)
+            _mockHttpMessageHandler.Protected()
+                .Setup<Task<HttpResponseMessage>>(
+                    "SendAsync",
+                    ItExpr.Is<HttpRequestMessage>(req => req.RequestUri!.ToString().Contains($"/assets/{expectedAssetId}") && !req.RequestUri!.ToString().Contains("/thumbnail")),
+                    ItExpr.IsAny<CancellationToken>()
+                )
+                .ReturnsAsync(() => new HttpResponseMessage
+                {
+                    StatusCode = HttpStatusCode.OK,
+                    Content = new StringContent(assetDtoJson)
+                });
+
             // Setup for ViewAssetAsync (thumbnail)
             var mockImageData = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 }; // Minimal JPEG
             _mockHttpMessageHandler.Protected()

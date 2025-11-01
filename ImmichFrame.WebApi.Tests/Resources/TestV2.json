@@ -35,7 +35,8 @@
     "ImagePan": true,
     "ImageFill": true,
     "Layout": "Layout_TEST",
-    "ChronologicalImagesCount": 7
+    "ChronologicalImagesCount": 7,
+    "VideoDuration": 7
   },
   "Accounts": [
     {
@@ -56,7 +57,9 @@
       ],
       "People": [
         "00000000-0000-0000-0000-000000000001"
-      ]
+      ],
+      "ShowVideos": true,
+      "ShowVideosOnly": true
     },
     {
       "ImmichServerUrl": "Account2.ImmichServerUrl_TEST",
@@ -76,7 +79,9 @@
       ],
       "People": [
         "00000000-0000-0000-0000-000000000001"
-      ]
+      ],
+      "ShowVideos": true,
+      "ShowVideosOnly": true
     }
   ]
 }

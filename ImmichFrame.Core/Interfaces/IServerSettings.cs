@@ -13,6 +13,8 @@
         public bool ShowMemories { get; }
         public bool ShowFavorites { get; }
         public bool ShowArchived { get; }
+        public bool ShowVideos { get; }
+        public bool ShowVideosOnly { get; }
         public int? ImagesFromDays { get; }
         public DateTime? ImagesFromDate { get; }
         public DateTime? ImagesUntilDate { get; }
@@ -58,5 +60,6 @@
         public string Layout { get; }
         public string Language { get; }
         public int ChronologicalImagesCount { get; }
+        public int VideoDuration { get; }
     }
 }

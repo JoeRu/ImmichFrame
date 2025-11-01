@@ -212,6 +212,7 @@ export type ClientSettingsDto = {
     imageFill?: boolean;
     layout?: string | null;
     language?: string | null;
+    videoDuration?: number;
 };
 export type IWeather = {
     location?: string | null;
