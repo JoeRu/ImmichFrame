@@ -60,6 +60,5 @@
         public string Layout { get; }
         public string Language { get; }
         public int ChronologicalImagesCount { get; }
-        public int VideoDuration { get; }
     }
 }

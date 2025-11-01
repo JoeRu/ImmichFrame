@@ -45,8 +45,8 @@
 	let timeoutId: NodeJS.Timeout;
 	let videoLoaded = false;
 	
-	// Get video duration from config store (default 15 seconds)
-	const videoDuration = $derived($configStore.videoDuration ?? 15);
+	// Get video duration from config store interval (default 15 seconds)
+	const videoDuration = $derived($configStore.interval ?? 15);
 
 	// Debug logging
 	$effect(() => {

@@ -54,7 +54,6 @@
     "ChronologicalImagesCount": 7,
     "ShowVideos": true,
     "ShowVideosOnly": true,
-    "VideoDuration": 7,
     "Account2.ImmichServerUrl": "Account2.ImmichServerUrl_TEST",
     "Account2.ApiKey": "Account2.ApiKey_TEST",
     "Account2.ImagesFromDate": "Account2.ImagesFromDate_TEST",
