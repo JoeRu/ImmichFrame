@@ -2,7 +2,7 @@
 	import type { AssetResponseDto } from '$lib/immichFrameApi';
 	import * as api from '$lib/index';
 	import ErrorElement from './error-element.svelte';
-	import Image from './image.svelte';
+	import Asset from './asset.svelte';
 	import LoadingElement from './LoadingElement.svelte';
 	import { fade } from 'svelte/transition';
 	import { configStore } from '$lib/stores/config.store';
@@ -27,6 +27,7 @@
 		imageZoom?: boolean;
 		imagePan?: boolean;
 		showInfo: boolean;
+		onVideoEnd?: () => void;
 	}
 
 	let {
@@ -44,7 +45,8 @@
 		imageFill = false,
 		imageZoom = false,
 		imagePan = false,
-		showInfo = $bindable(false)
+		showInfo = $bindable(false),
+		onVideoEnd
 	}: Props = $props();
 	let instantTransition = slideshowStore.instantTransition;
 	let transitionDuration = $derived(
@@ -81,8 +83,9 @@
 			{#if split}
 				<div class="grid grid-cols-2">
 					<div id="image_portrait_1" class="relative grid border-r-2 border-primary h-dvh-safe">
-						<Image
-							image={images[0]}
+						<Asset
+							multi={true}
+							asset={images[0]}
 							{interval}
 							{showLocation}
 							{showPhotoDate}
@@ -93,10 +96,12 @@
 							{imageZoom}
 							{imagePan}
 							bind:showInfo
+							{onVideoEnd}
 						/>
 					</div>
 					<div id="image_portrait_2" class="relative grid border-l-2 border-primary h-dvh-safe">
 						<Image
+							multi={true}
 							image={images[1]}
 							{interval}
 							{showLocation}
@@ -108,13 +113,14 @@
 							{imageZoom}
 							{imagePan}
 							bind:showInfo
+							{onVideoEnd}
 						/>
 					</div>
 				</div>
 			{:else}
 				<div id="image_default" class="relative grid h-dvh-safe w-screen">
-					<Image
-						image={images[0]}
+					<Asset
+						asset={images[0]}
 						{interval}
 						{showLocation}
 						{showPhotoDate}
@@ -125,6 +131,7 @@
 						{imageZoom}
 						{imagePan}
 						bind:showInfo
+						{onVideoEnd}
 					/>
 				</div>
 			{/if}

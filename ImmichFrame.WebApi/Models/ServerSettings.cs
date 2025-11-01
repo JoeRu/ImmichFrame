@@ -53,6 +53,7 @@ public class GeneralSettings : IGeneralSettings, IConfigSettable
     public bool ImageFill { get; set; } = false;
     public string Layout { get; set; } = "splitview";
     public int ChronologicalImagesCount { get; set; } = 0;
+    public int VideoDuration { get; set; } = 15;
     public int RenewImagesDuration { get; set; } = 30;
     public List<string> Webcalendars { get; set; } = new();
     public int RefreshAlbumPeopleInterval { get; set; } = 12;
@@ -70,6 +71,8 @@ public class ServerAccountSettings : IAccountSettings, IConfigSettable
     public bool ShowMemories { get; set; } = false;
     public bool ShowFavorites { get; set; } = false;
     public bool ShowArchived { get; set; } = false;
+    public bool ShowVideos { get; set; } = false;
+    public bool ShowVideosOnly { get; set; } = false;
 
     public int? ImagesFromDays { get; set; }
     public DateTime? ImagesFromDate { get; set; }

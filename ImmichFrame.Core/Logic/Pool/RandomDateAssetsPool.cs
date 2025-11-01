@@ -113,12 +113,20 @@ public class RandomDateAssetsPool : IAssetPool
     /// This method leverages caching to avoid repeated API calls.
     /// </summary>
     /// <param name="ct">Cancellation token for the asynchronous operation</param>
-    /// <returns>Total number of images in the account</returns>
+    /// <returns>Total number of assets (images and optionally videos) in the account</returns>
     public async Task<long> GetAssetCount(CancellationToken ct = default)
     {
-        var cacheKey = $"{nameof(RandomDateAssetsPool)}:stats:v1:archived={accountSettings.ShowArchived}";
-        return (await apiCache.GetOrAddAsync(cacheKey,
-            () => immichApi.GetAssetStatisticsAsync(null, accountSettings.ShowArchived, null, ct))).Images;
+        var cacheKey = $"{nameof(RandomDateAssetsPool)}:stats:v1:archived={accountSettings.ShowArchived}:videos={accountSettings.ShowVideos}:videosOnly={accountSettings.ShowVideosOnly}";
+        var stats = await apiCache.GetOrAddAsync(cacheKey,
+            () => immichApi.GetAssetStatisticsAsync(null, accountSettings.ShowArchived, null, ct));
+        
+        // Return appropriate count based on video settings
+        if (accountSettings.ShowVideosOnly)
+            return stats.Videos;
+        else if (accountSettings.ShowVideos)
+            return stats.Total;
+        else
+            return stats.Images;
     }
 
     /// <summary>
@@ -167,15 +175,23 @@ public class RandomDateAssetsPool : IAssetPool
 
     /// <summary>
     /// Applies account-specific filters to the asset collection.
-    /// Filters include image type, archive status, date ranges, and rating constraints.
+    /// Filters include asset type (images/videos), archive status, date ranges, and rating constraints.
     /// This ensures only assets matching the user's preferences are returned.
     /// </summary>
     /// <param name="assets">Raw asset collection to filter</param>
     /// <returns>Filtered asset collection based on account settings</returns>
     private IEnumerable<AssetResponseDto> ApplyAccountFilters(IEnumerable<AssetResponseDto> assets)
     {
-        // Display only Images (not videos) - this pool is specifically for photo selection
-        var filteredAssets = assets.Where(x => x.Type == AssetTypeEnum.IMAGE);
+        // Filter by asset type based on account settings
+        var filteredAssets = assets.Where(x => 
+        {
+            if (accountSettings.ShowVideosOnly)
+                return x.Type == AssetTypeEnum.VIDEO;
+            else if (accountSettings.ShowVideos)
+                return x.Type == AssetTypeEnum.IMAGE || x.Type == AssetTypeEnum.VIDEO;
+            else
+                return x.Type == AssetTypeEnum.IMAGE;
+        });
 
         // Filter out archived assets if not explicitly requested by user settings
         if (!accountSettings.ShowArchived)
@@ -266,7 +282,7 @@ public class RandomDateAssetsPool : IAssetPool
                 Size = 1,
                 Page = 1,
                 Order = AssetOrder.Asc, // Oldest first
-                Type = AssetTypeEnum.IMAGE,
+                Type = GetSearchAssetType(),
                 WithExif = true,
                 Visibility = accountSettings.ShowArchived ? AssetVisibility.Archive : AssetVisibility.Timeline
             };
@@ -280,7 +296,7 @@ public class RandomDateAssetsPool : IAssetPool
                 Size = 1,
                 Page = 1,
                 Order = AssetOrder.Desc, // Newest first
-                Type = AssetTypeEnum.IMAGE,
+                Type = GetSearchAssetType(),
                 WithExif = true,
                 Visibility = accountSettings.ShowArchived ? AssetVisibility.Archive : AssetVisibility.Timeline
             };
@@ -427,7 +443,7 @@ public class RandomDateAssetsPool : IAssetPool
                 TakenBefore = endDate,
                 Size = Math.Max(_assetsPerRandomDate * 4, 100), // Request more to account for deduplication
                 Page = 1,
-                Type = AssetTypeEnum.IMAGE,
+                Type = GetSearchAssetType(),
                 WithExif = true,
                 Visibility = accountSettings.ShowArchived ? AssetVisibility.Archive : AssetVisibility.Timeline,
                 Order = AssetOrder.Desc
@@ -582,7 +598,7 @@ public class RandomDateAssetsPool : IAssetPool
             {
                 Size = Math.Max(400, _requestedAssetCount * 6), // Request more to account for deduplication
                 Page = 1,
-                Type = AssetTypeEnum.IMAGE,
+                Type = GetSearchAssetType(),
                 WithExif = true,
                 Visibility = accountSettings.ShowArchived ? AssetVisibility.Archive : AssetVisibility.Timeline,
                 Order = AssetOrder.Desc
@@ -704,7 +720,7 @@ public class RandomDateAssetsPool : IAssetPool
                 {
                     Size = 1,
                     Page = 1,
-                    Type = AssetTypeEnum.IMAGE,
+                    Type = GetSearchAssetType(),
                     TakenAfter = monthStart,
                     TakenBefore = monthEnd.AddDays(1),
                     WithExif = true,
@@ -873,6 +889,21 @@ public class RandomDateAssetsPool : IAssetPool
     /// <returns>Cache key for cluster data</returns>
     private string GenerateClusterCacheKey(DateTime oldestDate, DateTime youngestDate)
     {
-        return $"{ClusterCachePrefix}:v1:range={oldestDate:yyyy-MM}to{youngestDate:yyyy-MM}:archived={accountSettings.ShowArchived}";
+        return $"{ClusterCachePrefix}:v1:range={oldestDate:yyyy-MM}to{youngestDate:yyyy-MM}:archived={accountSettings.ShowArchived}:videos={accountSettings.ShowVideos}:videosOnly={accountSettings.ShowVideosOnly}";
+    }
+
+    /// <summary>
+    /// Gets the appropriate asset type for API queries based on account settings.
+    /// Returns VIDEO for videos only, null for all types when both enabled, or IMAGE when only images wanted.
+    /// </summary>
+    /// <returns>AssetTypeEnum.VIDEO for videos only, AssetTypeEnum.IMAGE for images only, or null for all asset types</returns>
+    private AssetTypeEnum? GetSearchAssetType()
+    {
+        if (accountSettings.ShowVideosOnly)
+            return AssetTypeEnum.VIDEO;
+        else if (accountSettings.ShowVideos)
+            return null;
+        else
+            return AssetTypeEnum.IMAGE;
     }
 }

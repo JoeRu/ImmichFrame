@@ -19,7 +19,8 @@ public class FavoriteAssetsPool(IApiCache apiCache, ImmichApi immichApi, IAccoun
                 Page = page,
                 Size = batchSize,
                 IsFavorite = true,
-                Type = AssetTypeEnum.IMAGE,
+                Type = accountSettings.ShowVideosOnly ? AssetTypeEnum.VIDEO : 
+                       accountSettings.ShowVideos ? null : AssetTypeEnum.IMAGE,
                 WithExif = true,
                 WithPeople = true
             };

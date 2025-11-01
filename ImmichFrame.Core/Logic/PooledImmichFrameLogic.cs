@@ -89,8 +89,11 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
 
     public async Task<(string fileName, string ContentType, Stream fileStream)> GetImage(Guid id)
     {
-// Check if the image is already downloaded
-        if (_generalSettings.DownloadImages)
+        // First, get asset info to determine if it's a video or image
+        var assetInfo = await _immichApi.GetAssetInfoAsync(id, null);
+        
+        // Check if the asset is already downloaded (for images only, skip download for videos)
+        if (_generalSettings.DownloadImages && assetInfo.Type == AssetTypeEnum.IMAGE)
         {
             if (!Directory.Exists(_downloadLocation))
             {
@@ -115,7 +118,18 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
             }
         }
 
-        var data = await _immichApi.ViewAssetAsync(id, string.Empty, AssetMediaSize.Preview);
+        // Use appropriate API endpoint based on asset type
+        FileResponse data;
+        if (assetInfo.Type == AssetTypeEnum.VIDEO)
+        {
+            // Use video playback endpoint for videos
+            data = await _immichApi.PlayAssetVideoAsync(id, string.Empty);
+        }
+        else
+        {
+            // Use view asset endpoint for images (thumbnail/preview)
+            data = await _immichApi.ViewAssetAsync(id, string.Empty, AssetMediaSize.Preview);
+        }
 
         if (data == null)
             throw new AssetNotFoundException($"Asset {id} was not found!");
@@ -126,10 +140,31 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
             contentType = data.Headers["Content-Type"].FirstOrDefault() ?? "";
         }
 
-        var ext = contentType.ToLower() == "image/webp" ? "webp" : "jpeg";
+        // Determine file extension based on asset type and content type
+        string ext;
+        if (assetInfo.Type == AssetTypeEnum.VIDEO)
+        {
+            // For videos, try to determine extension from content type or default to mp4
+            ext = contentType.ToLower() switch
+            {
+                var ct when ct.Contains("mp4") => "mp4",
+                var ct when ct.Contains("webm") => "webm",
+                var ct when ct.Contains("ogg") => "ogg",
+                var ct when ct.Contains("avi") => "avi",
+                var ct when ct.Contains("mov") => "mov",
+                _ => "mp4" // Default to mp4 for videos
+            };
+        }
+        else
+        {
+            // For images, use existing logic
+            ext = contentType.ToLower() == "image/webp" ? "webp" : "jpeg";
+        }
+        
         var fileName = $"{id}.{ext}";
 
-        if (_generalSettings.DownloadImages)
+        // Only save images to folder, not videos (videos are typically large)
+        if (_generalSettings.DownloadImages && assetInfo.Type == AssetTypeEnum.IMAGE)
         {
             var stream = data.Stream;
 

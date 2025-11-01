@@ -7,9 +7,17 @@ public class AllAssetsPool(IApiCache apiCache, ImmichApi immichApi, IAccountSett
 {
     public async Task<long> GetAssetCount(CancellationToken ct = default)
     {
-        //Retrieve total images count (unfiltered); will update to query filtered stats from Immich
-        return (await apiCache.GetOrAddAsync(nameof(AllAssetsPool),
-            () => immichApi.GetAssetStatisticsAsync(null, false, null, ct))).Images;
+        //Retrieve total asset count (unfiltered); will update to query filtered stats from Immich
+        var stats = await apiCache.GetOrAddAsync(nameof(AllAssetsPool),
+            () => immichApi.GetAssetStatisticsAsync(null, false, null, ct));
+        
+        // Return appropriate count based on video settings
+        if (accountSettings.ShowVideosOnly)
+            return stats.Videos;
+        else if (accountSettings.ShowVideos)
+            return stats.Total;
+        else
+            return stats.Images;
     }
     
     public async Task<IEnumerable<AssetResponseDto>> GetAssets(int requested, CancellationToken ct = default)
@@ -17,7 +25,8 @@ public class AllAssetsPool(IApiCache apiCache, ImmichApi immichApi, IAccountSett
         var searchDto = new RandomSearchDto
             {
                 Size = requested,
-                Type = AssetTypeEnum.IMAGE,
+                Type = accountSettings.ShowVideosOnly ? AssetTypeEnum.VIDEO : 
+                       accountSettings.ShowVideos ? null : AssetTypeEnum.IMAGE,
                 WithExif = true,
                 WithPeople = true
             };

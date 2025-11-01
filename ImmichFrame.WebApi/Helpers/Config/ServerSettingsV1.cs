@@ -12,6 +12,8 @@ public class ServerSettingsV1 : IConfigSettable
     public bool ShowMemories { get; set; } = false;
     public bool ShowFavorites { get; set; } = false;
     public bool ShowArchived { get; set; } = false;
+    public bool ShowVideos { get; set; } = false;
+    public bool ShowVideosOnly { get; set; } = false;
     public bool DownloadImages { get; set; } = false;
     public int RenewImagesDuration { get; set; } = 30;
     public int? ImagesFromDays { get; set; }
@@ -53,6 +55,7 @@ public class ServerSettingsV1 : IConfigSettable
     public bool ImageFill { get; set; } = false;
     public string Layout { get; set; } = "splitview";
     public int ChronologicalImagesCount { get; set; } = 3;
+    public int VideoDuration { get; set; } = 15;
 }
 
 /// <summary>
@@ -72,6 +75,8 @@ public class ServerSettingsV1Adapter(ServerSettingsV1 _delegate) : IServerSettin
         public bool ShowMemories => _delegate.ShowMemories;
         public bool ShowFavorites => _delegate.ShowFavorites;
         public bool ShowArchived => _delegate.ShowArchived;
+        public bool ShowVideos => _delegate.ShowVideos;
+        public bool ShowVideosOnly => _delegate.ShowVideosOnly;
         public int? ImagesFromDays => _delegate.ImagesFromDays;
         public DateTime? ImagesFromDate => _delegate.ImagesFromDate;
         public DateTime? ImagesUntilDate => _delegate.ImagesUntilDate;
@@ -117,5 +122,6 @@ public class ServerSettingsV1Adapter(ServerSettingsV1 _delegate) : IServerSettin
         public string Layout => _delegate.Layout;
         public string Language => _delegate.Language;
         public int ChronologicalImagesCount => _delegate.ChronologicalImagesCount;
+        public int VideoDuration => _delegate.VideoDuration;
     }
 }
