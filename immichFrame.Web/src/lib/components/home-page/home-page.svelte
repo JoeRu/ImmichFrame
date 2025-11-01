@@ -159,7 +159,9 @@
 			$configStore.layout?.trim().toLowerCase() == 'splitview' &&
 			assetBacklog.length > 1 &&
 			isHorizontal(assetBacklog[0]) &&
-			isHorizontal(assetBacklog[1])
+			isHorizontal(assetBacklog[1]) &&
+			!isVideo(assetBacklog[0]) &&
+			!isVideo(assetBacklog[1])
 		) {
 			next = assetBacklog.splice(0, 2);
 		} else {
@@ -198,7 +200,9 @@
 			$configStore.layout?.trim().toLowerCase() == 'splitview' &&
 			assetHistory.length > 1 &&
 			isHorizontal(assetHistory[assetHistory.length - 1]) &&
-			isHorizontal(assetHistory[assetHistory.length - 2])
+			isHorizontal(assetHistory[assetHistory.length - 2]) &&
+			!isVideo(assetHistory[assetHistory.length - 1]) &&
+			!isVideo(assetHistory[assetHistory.length - 2])
 		) {
 			next = assetHistory.splice(assetHistory.length - 2, 2);
 		} else {
@@ -224,6 +228,10 @@
 			[imageHeight, imageWidth] = [imageWidth, imageHeight];
 		}
 		return imageHeight > imageWidth; // or imageHeight > imageWidth * 1.25;
+	}
+
+	function isVideo(asset: api.AssetResponseDto) {
+		return asset.type === 1; // AssetTypeEnum.VIDEO = 1
 	}
 
 	function hasBirthday(assets: api.AssetResponseDto[]) {

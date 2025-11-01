@@ -53,7 +53,6 @@ public class GeneralSettings : IGeneralSettings, IConfigSettable
     public bool ImageFill { get; set; } = false;
     public string Layout { get; set; } = "splitview";
     public int ChronologicalImagesCount { get; set; } = 0;
-    public int VideoDuration { get; set; } = 15;
     public int RenewImagesDuration { get; set; } = 30;
     public List<string> Webcalendars { get; set; } = new();
     public int RefreshAlbumPeopleInterval { get; set; } = 12;

@@ -55,7 +55,6 @@ public class ServerSettingsV1 : IConfigSettable
     public bool ImageFill { get; set; } = false;
     public string Layout { get; set; } = "splitview";
     public int ChronologicalImagesCount { get; set; } = 3;
-    public int VideoDuration { get; set; } = 15;
 }
 
 /// <summary>
@@ -122,6 +121,5 @@ public class ServerSettingsV1Adapter(ServerSettingsV1 _delegate) : IServerSettin
         public string Layout => _delegate.Layout;
         public string Language => _delegate.Language;
         public int ChronologicalImagesCount => _delegate.ChronologicalImagesCount;
-        public int VideoDuration => _delegate.VideoDuration;
     }
 }

@@ -35,8 +35,7 @@
     "ImagePan": true,
     "ImageFill": true,
     "Layout": "Layout_TEST",
-    "ChronologicalImagesCount": 7,
-    "VideoDuration": 7
+    "ChronologicalImagesCount": 7
   },
   "Accounts": [
     {

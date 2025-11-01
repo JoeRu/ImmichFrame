@@ -35,7 +35,6 @@ General:
   ImageFill: true
   Layout: Layout_TEST
   ChronologicalImagesCount: 7
-  VideoDuration: 7
 Accounts:
 - ImmichServerUrl: Account1.ImmichServerUrl_TEST
   ApiKey: Account1.ApiKey_TEST
