@@ -58,5 +58,5 @@
     "Account2.ApiKey": "Account2.ApiKey_TEST",
     "Account2.ImagesFromDate": "Account2.ImagesFromDate_TEST",
     "Account2.ShowVideos": true,
-    "Account2.ShowVideosOnly": true
+    "Account2.ShowVideosOnly": false
 }

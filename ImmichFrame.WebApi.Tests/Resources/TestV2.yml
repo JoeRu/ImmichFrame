@@ -52,7 +52,7 @@ Accounts:
   People:
   - 00000000-0000-0000-0000-000000000001
   ShowVideos: true
-  ShowVideosOnly: true
+  ShowVideosOnly: false
 - ImmichServerUrl: Account2.ImmichServerUrl_TEST
   ApiKey: Account2.ApiKey_TEST
   ImagesFromDate: '2020-01-02'
