@@ -44,8 +44,22 @@
 	/* Default colors */
 	--primary-color: #f5deb3;
 	--secondary-color: #000000;
+	--complementary-color: #2d4a87; /* Complementary to default primary */
 	font-family: 'Overpass', sans-serif;
 	/* Used by layouts to ensure proper spacing between navbar and content */
+}
+
+/* Enhanced text readability utilities for small text */
+.text-enhanced-small {
+	font-weight: 600;
+	letter-spacing: 0.025em;
+	line-height: 1.3;
+}
+
+.text-crisp {
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
 }
 
 :root.dark {

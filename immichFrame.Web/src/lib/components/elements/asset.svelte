@@ -20,6 +20,7 @@
 		multi?: boolean;
 		showInfo: boolean;
 		onVideoEnd?: () => void;
+		onColorExtracted?: (videoElement: HTMLVideoElement) => void;
 	}
 
 	let {
@@ -35,7 +36,8 @@
 		interval,
 		multi = false,
 		showInfo = $bindable(false),
-		onVideoEnd
+		onVideoEnd,
+		onColorExtracted
 	}: Props = $props();
 
 	// AssetTypeEnum: 0 = IMAGE, 1 = VIDEO, 2 = AUDIO, 3 = OTHER
@@ -57,6 +59,7 @@
 		{multi}
 		bind:showInfo
 		{onVideoEnd}
+		{onColorExtracted}
 	/>
 {:else}
 	<Image

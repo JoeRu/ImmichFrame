@@ -54,7 +54,7 @@
 
 <div
 	id="clock"
-	class="fixed bottom-0 left-0 z-10 text-center text-primary
+	class="fixed bottom-0 left-0 z-10 text-center text-complementary text-shadow-md bg-black/8 rounded-tr-lg
 	{$configStore.style == 'solid' ? 'bg-secondary rounded-tr-2xl' : ''}
 	{$configStore.style == 'transition' ? 'bg-gradient-to-r from-secondary from-0% pr-10' : ''}
 	{$configStore.style == 'blur' ? 'backdrop-blur-lg rounded-tr-2xl' : ''}	
@@ -65,7 +65,7 @@
 	</p>
 	<p
 		id="clocktime"
-		class="mt-2 text-4xl sm:text-4xl md:text-6xl lg:text-8xl font-bold text-shadow-lg"
+		class="mt-2 text-4xl sm:text-4xl md:text-6xl lg:text-8xl font-bold text-shadow-md"
 	>
 		{timePortion()}
 	</p>

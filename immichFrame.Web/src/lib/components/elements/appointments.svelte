@@ -48,10 +48,10 @@
 	}
 </script>
 
-{#if appointments}
+{#if appointments && appointments.length > 0}
 	<div
 		id="appointments"
-		class="fixed top-0 right-0 w-auto z-10 text-center text-primary m-5 max-w-[20%] hidden lg:block md:min-w-[10%]"
+		class="fixed top-0 right-0 w-auto z-10 text-center text-complementary text-shadow-md bg-black/8 rounded-bl-lg p-3 m-5 max-w-[20%] hidden lg:block md:min-w-[10%]"
 	>
 		<!-- <div class="text-4xl mx-8 font-bold">Appointments</div> -->
 		<div class="">
