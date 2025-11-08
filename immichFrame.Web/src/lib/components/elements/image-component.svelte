@@ -28,6 +28,7 @@
 		imagePan?: boolean;
 		showInfo: boolean;
 		onVideoEnd?: () => void;
+		onColorExtracted?: (videoElement: HTMLVideoElement) => void;
 	}
 
 	let {
@@ -46,7 +47,8 @@
 		imageZoom = false,
 		imagePan = false,
 		showInfo = $bindable(false),
-		onVideoEnd
+		onVideoEnd,
+		onColorExtracted
 	}: Props = $props();
 	let instantTransition = slideshowStore.instantTransition;
 	let transitionDuration = $derived(
@@ -95,6 +97,7 @@
 							{imagePan}
 							bind:showInfo
 							{onVideoEnd}
+							{onColorExtracted}
 						/>
 					</div>
 					<div id="image_portrait_2" class="relative grid border-l-2 border-primary h-dvh-safe">
@@ -112,6 +115,7 @@
 							{imagePan}
 							bind:showInfo
 							{onVideoEnd}
+							{onColorExtracted}
 						/>
 					</div>
 				</div>
@@ -130,6 +134,7 @@
 						{imagePan}
 						bind:showInfo
 						{onVideoEnd}
+						{onColorExtracted}
 					/>
 				</div>
 			{/if}

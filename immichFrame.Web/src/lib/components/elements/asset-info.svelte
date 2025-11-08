@@ -68,7 +68,7 @@
 {#if showPhotoDate || showLocation || showImageDesc || showPeopleDesc || showAlbumName}
 	<div
 		id="imageinfo"
-		class="immichframe_image_metadata absolute bottom-0 right-0 z-100 text-primary p-1 text-right
+		class="immichframe_image_metadata absolute bottom-0 right-0 z-100 text-complementary bg-black/35 border border-white/20 rounded-tl-lg p-3 text-right text-enhanced-small text-crisp
 		{$configStore.style == 'solid' ? 'bg-secondary rounded-tl-2xl' : ''}
 		{$configStore.style == 'transition' ? 'bg-gradient-to-l from-secondary from-0% pl-10' : ''}
 		{$configStore.style == 'blur' ? 'backdrop-blur-lg rounded-tl-2xl' : ''}	"
@@ -111,6 +111,10 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		margin: 0.2rem 0.5rem;
+		margin: 0.3rem 0.5rem;
+		font-weight: 600;
+		font-size: 0.95rem;
+		line-height: 1.3;
+		letter-spacing: 0.02em;
 	}
 </style>

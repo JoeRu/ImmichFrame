@@ -73,7 +73,7 @@
 {#if overlayVisible}
 	<div class="inset-0 z-[100] grid grid-cols-3 gap-2 {infoVisible ? 'hidden' : ''}">
 		<div id="overlayback" class="group grid place-items-center">
-			<button class="opacity-0 group-hover:opacity-100 text-primary" onclick={back}
+			<button class="opacity-0 group-hover:opacity-100 text-complementary text-shadow-md bg-black/15 rounded-full p-2" onclick={back}
 				><Icon
 					title="Back"
 					class="max-h-[min(10rem,33vh)] max-w-[min(10rem,33vh)] h-[33vh] w-[33vw]top"
@@ -85,7 +85,7 @@
 
 		<div class="grid grid-rows-3 gap-2">
 			<div id="overlayInfo" class="group grid place-items-center">
-				<button class="opacity-0 hover:opacity-100 text-primary" onclick={showInfo}
+				<button class="opacity-0 hover:opacity-100 text-complementary text-shadow-md bg-black/15 rounded-full p-2" onclick={showInfo}
 					><Icon
 						title="Info"
 						class="max-h-[min(10rem,33vh)] max-w-[min(10rem,33vh)] h-[33vh] w-[33vw]top"
@@ -96,7 +96,7 @@
 			</div>
 
 			<div id="overlaypause" class="group grid place-items-center">
-				<button onclick={pause} class="opacity-0 group-hover:opacity-100 text-primary">
+				<button onclick={pause} class="opacity-0 group-hover:opacity-100 text-complementary text-shadow-md bg-black/15 rounded-full p-2">
 					<Icon
 						class="max-h-[min(10rem,33vh)] max-w-[min(10rem,33vh)] h-[33vh] w-[33vw]"
 						title={status == ProgressBarStatus.Paused ? 'Play' : 'Pause'}
@@ -112,7 +112,7 @@
 		</div>
 
 		<div id="overlaynext" class="group grid place-items-center">
-			<button class="opacity-0 group-hover:opacity-100 text-primary" onclick={next}
+			<button class="opacity-0 group-hover:opacity-100 text-complementary text-shadow-md bg-black/15 rounded-full p-2" onclick={next}
 				><Icon
 					title="Next"
 					class="max-h-[min(10rem,33vh)] max-w-[min(10rem,33vh)] h-[33vh] w-[33vw]top"

@@ -15,6 +15,7 @@
 	import Appointments from '../elements/appointments.svelte';
 	import LoadingElement from '../elements/LoadingElement.svelte';
 	import { page } from '$app/state';
+	import { extractColorFromImageUrl, extractColorFromVideo, generateComplementaryColor, generateTextColor, getContrastRatio, type ExtractedColor } from '$lib/utils/colorExtractor';
 
 	interface ImagesState {
 		images: [string, api.AssetResponseDto, api.AlbumResponseDto[]][];
@@ -184,6 +185,9 @@
 		displayingAssets = next;
 		updateImagePromises();
 		imagesState = await loadImages(next);
+		
+		// Update theme colors based on the new asset
+		await updateThemeFromAsset();
 	}
 
 	const handleVideoEnd = async () => {
@@ -220,6 +224,9 @@
 		displayingAssets = next;
 		updateImagePromises();
 		imagesState = await loadImages(next);
+		
+		// Update theme colors based on the new asset
+		await updateThemeFromAsset();
 	}
 
 	function isHorizontal(asset: api.AssetResponseDto) {
@@ -234,6 +241,91 @@
 
 	function isVideo(asset: api.AssetResponseDto) {
 		return asset.type === 1; // AssetTypeEnum.VIDEO = 1
+	}
+
+	/**
+	 * Extract color from the currently displayed asset and update the theme
+	 */
+	async function updateThemeFromAsset() {
+		if (!displayingAssets || displayingAssets.length === 0) return;
+
+		const primaryAsset = displayingAssets[0]; // Use first asset for theming
+		
+		try {
+			let extractedColor: ExtractedColor;
+			
+			if (isVideo(primaryAsset)) {
+				// For videos, we'll extract from the video element once it's loaded
+				// This will be called from the video component when ready
+				return;
+			} else {
+				// For images, extract color from the loaded image
+				const imagePromise = imagePromisesDict[primaryAsset.id];
+				if (imagePromise) {
+					const [imageUrl] = await imagePromise;
+					if (imageUrl) {
+						extractedColor = await extractColorFromImageUrl(imageUrl);
+						updateThemeColors(extractedColor);
+					}
+				}
+			}
+		} catch (error) {
+			console.warn('Failed to extract color from asset:', error);
+			// Keep existing theme if extraction fails
+		}
+	}
+
+	/**
+	 * Update CSS custom properties with extracted colors
+	 */
+	function updateThemeColors(baseColor: ExtractedColor) {
+		// Set the primary color to the extracted dominant color
+		document.documentElement.style.setProperty('--primary-color', baseColor.hex);
+		
+		// Generate and set a complementary color for UI elements
+		const complementaryColor = generateComplementaryColor(baseColor);
+		document.documentElement.style.setProperty('--complementary-color', complementaryColor.hex);
+		
+		// Generate optimal text color with enhanced contrast checking
+		const textColor = generateTextColor(baseColor.hex);
+		document.documentElement.style.setProperty('--text-color', textColor);
+		
+		// Calculate contrast ratios for dynamic text enhancement selection
+		const contrastRatio = getContrastRatio(complementaryColor.hex, baseColor.hex);
+		let shadowClass = 'none'; // default to no shadow for clean text
+		let textEnhancement = 'bg-black/20'; // background-based enhancement
+		
+		if (contrastRatio < 2) {
+			shadowClass = 'outline'; // Crisp outline for very poor contrast
+			textEnhancement = 'bg-black/40 border border-white/20';
+		} else if (contrastRatio < 3) {
+			shadowClass = 'stroke-light'; // Light stroke for poor contrast  
+			textEnhancement = 'bg-black/30 border border-white/15';
+		} else if (contrastRatio < 4.5) {
+			shadowClass = 'none'; // No shadow for moderate contrast
+			textEnhancement = 'bg-black/25 border border-white/10';
+		} else {
+			shadowClass = 'none'; // No shadow for good contrast
+			textEnhancement = 'bg-black/15';
+		}
+		
+		// Set dynamic enhancement classes for components to use
+		document.documentElement.style.setProperty('--text-shadow-class', shadowClass);
+		document.documentElement.style.setProperty('--text-enhancement', textEnhancement);
+		
+		console.log(`Theme updated - Primary: ${baseColor.hex}, Complementary: ${complementaryColor.hex}, Text: ${textColor}, Contrast: ${contrastRatio.toFixed(2)}, Shadow: ${shadowClass}`);
+	}
+
+	/**
+	 * Handle color extraction from video elements
+	 */
+	function extractVideoColor(videoElement: HTMLVideoElement) {
+		try {
+			const extractedColor = extractColorFromVideo(videoElement);
+			updateThemeColors(extractedColor);
+		} catch (error) {
+			console.warn('Failed to extract color from video:', error);
+		}
 	}
 
 	function hasBirthday(assets: api.AssetResponseDto[]) {
@@ -330,8 +422,12 @@
 	onMount(() => {
 		window.addEventListener('mousemove', showCursor);
 		window.addEventListener('click', showCursor);
+		
+		// Set initial fallback colors (will be overridden by dynamic extraction)
 		if ($configStore.primaryColor) {
 			document.documentElement.style.setProperty('--primary-color', $configStore.primaryColor);
+			const complementaryColor = generateTextColor($configStore.primaryColor);
+			document.documentElement.style.setProperty('--complementary-color', complementaryColor);
 		}
 
 		if ($configStore.secondaryColor) {
@@ -391,6 +487,7 @@
 				imagePan={$configStore.imagePan}
 				bind:showInfo={infoVisible}
 				onVideoEnd={handleVideoEnd}
+				onColorExtracted={extractVideoColor}
 			/>
 		</div>
 

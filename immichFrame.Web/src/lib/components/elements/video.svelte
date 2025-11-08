@@ -23,6 +23,7 @@
 		multi?: boolean;
 		showInfo: boolean;
 		onVideoEnd?: () => void;
+		onColorExtracted?: (videoElement: HTMLVideoElement) => void;
 	}
 
 	let {
@@ -38,7 +39,8 @@
 		interval,
 		multi = false,
 		showInfo = $bindable(false),
-		onVideoEnd
+		onVideoEnd,
+		onColorExtracted
 	}: Props = $props();
 
 	let videoElement: HTMLVideoElement;
@@ -69,6 +71,16 @@
 			try {
 				await videoElement.play();
 				console.log('Video started playing');
+				
+				// Extract color from video for theme update
+				if (onColorExtracted) {
+					// Wait a moment for video to start playing and have frames available
+					setTimeout(() => {
+						if (videoElement && onColorExtracted) {
+							onColorExtracted(videoElement);
+						}
+					}, 100);
+				}
 				
 				// Set timeout to stop video after configured duration
 				timeoutId = setTimeout(() => {
