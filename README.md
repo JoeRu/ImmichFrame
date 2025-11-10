@@ -7,7 +7,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/3rob3/ImmichFrame">
+  <a href="https://github.com/JoeRu/ImmichFrame">
     <img src="design/AppIcon.png" alt="Logo" width="200" height="200">
   </a>
 
@@ -23,14 +23,128 @@
     ·
     <a href="https://demo.immichframe.dev">Demo</a>
     ·
-    <a href="https://github.com/3rob3/ImmichFrame/issues">Report Bug</a>
+    <a href="https://github.com/JoeRu/ImmichFrame/issues">Report Bug</a>
     ·
-    <a href="https://github.com/3rob3/ImmichFrame/issues">Request Feature</a>
+    <a href="https://github.com/JoeRu/ImmichFrame/issues">Request Feature</a>
   </p>
 </div>
 
 ## 📄 Documentation
 You can find the documentation [here](https://immichframe.dev).
+
+### 🎬 Video Branch Features
+
+> **Note**: This branch includes enhanced features not available in the main branch.
+
+#### 🆕 New Features in Video Branch:
+
+- **📹 Video Asset Support**: 
+  - Display video files from your Immich library in the slideshow
+  - Seamless playback of MP4, MOV, and other supported video formats
+  - Video controls and automatic progression in slideshow mode
+
+- **🎨 Dynamic Color Adaptation**: 
+  - Real-time color extraction from currently displayed assets (images and videos)
+  - Automatic UI theming with complementary colors derived from asset content
+  - Enhanced text contrast with WCAG AAA compliance (7:1 ratio) for optimal readability
+  - Shadow-free text rendering with enhanced typography for better legibility
+
+- **📅 Chronological Asset Sets** (RandomDateAssetsPool Enhancement):
+  - Improved balanced photo selection across your entire library timeline
+  - Cluster-based algorithm prevents bias toward newer photos
+  - Better temporal distribution for truly random chronological selection
+
+#### 🔧 Technical Improvements:
+- **Frontend**: Enhanced Svelte components with Canvas API color extraction
+- **Backend**: Optimized C# asset pool algorithms with bias and Error of shuffling removal
+- **UI/UX**: Improved contrast handling and typography without blur effects
+
+### ⚙️ Configuration Guide
+
+#### Chronological Asset Selection
+
+The **`ChronologicalImagesCount`** setting controls how many assets are selected using the enhanced chronological algorithm:
+
+```json
+{
+  "ChronologicalImagesCount": 0
+}
+```
+
+**Values:**
+- **`0` (Recommended)**: Uses the improved RandomDateAssetsPool for all assets
+  - Provides balanced selection across your entire photo library timeline
+  - Eliminates bias toward newer photos
+  - Ensures truly random chronological distribution
+- **`> 0`**: Mixed mode - uses chronological selection for specified count, then falls back to other methods
+  - May result in less balanced temporal distribution
+
+#### Video Configuration Options
+
+Configure video playback with these settings:
+
+```json
+{
+  "ShowVideos": true,
+  "ShowVideosOnly": false
+}
+```
+
+**Setting Combinations:**
+
+| ShowVideos | ShowVideosOnly | Result |
+|------------|----------------|---------|
+| `true` | `false` | **Mixed Mode** - Shows both images and videos in slideshow |
+| `true` | `true` | **Videos Only** - Shows only video assets |
+| `false` | `false` | **Images Only** - Shows only image assets (default behavior) |
+| `false` | `true` | ❌ **Invalid** - Cannot show videos only when videos are disabled |
+
+**Recommended Settings:**
+- **For mixed slideshows**: `"ShowVideos": true, "ShowVideosOnly": false`
+- **For video-only digital frames**: `"ShowVideos": true, "ShowVideosOnly": true`
+- **For traditional photo frames**: `"ShowVideos": false, "ShowVideosOnly": false`
+
+#### Settings Ignored with ChronologicalImagesCount > 0
+
+> **Important**: When using `ChronologicalImagesCount > 0`, the following filter settings are **ignored** for the chronological portion:
+
+```json
+{
+  "ImagesFromDate": null,          // ❌ Ignored - chronological algorithm handles date ranges
+  "ShowMemories": false,           // ❌ Ignored - memories filtering not applied
+  "ShowFavorites": false,          // ❌ Ignored - favorites filtering not applied  
+  "ShowArchived": false,           // ❌ Ignored - archive filtering not applied
+  "ImagesFromDays": null,          // ❌ Ignored - relative date filtering not applied
+  "ImagesUntilDate": "2020-01-02", // ❌ Ignored - end date filtering not applied
+  "ChronologicalImagesCount": 100   // ✅ Used - specifies how many assets use chronological selection
+}
+```
+
+**Why These Are Ignored:**
+- The chronological algorithm (`RandomDateAssetsPool`) has its own balanced selection logic
+- It creates temporal clusters and selects across your entire library timeline
+- External filters would interfere with the balanced chronological distribution
+- After chronological assets are selected, remaining assets can use these filters
+
+#### Compatible Feature Combinations
+
+**✅ Works Well Together:**
+- `ChronologicalImagesCount: 0` + All filter settings + `ShowVideos: true` + Dynamic Color Adaptation
+- `ChronologicalImagesCount: 0` + `ShowMemories: true` + `ShowFavorites: true`
+- Chronological selection applies to both images and videos
+- Color extraction works for both asset types
+
+**⚠️ Mixed Mode Behavior (`ChronologicalImagesCount > 0`):**
+- First N assets: Selected chronologically (filters ignored)
+- Remaining assets: Use standard selection with all filter settings applied
+- May result in inconsistent filtering across the slideshow
+
+**🎯 Recommended Approach:**
+- Use `ChronologicalImagesCount: 0` for consistent behavior across all assets
+- Apply filters like `ShowMemories`, `ShowFavorites`, etc. normally
+- This ensures all your filter preferences are respected
+
+
 
 ## 🖼️ Demo
 

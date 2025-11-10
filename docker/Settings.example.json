@@ -47,6 +47,8 @@
       "ShowArchived": false,
       "ImagesFromDays": null,
       "ImagesUntilDate": "2020-01-02",
+      "ShowVideos": true,
+      "ShowVideosOnly": false,
       "Rating": null,
       "Albums": [
         "UUID"
