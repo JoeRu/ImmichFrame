@@ -29,12 +29,33 @@
   </p>
 </div>
 
-## 📄 Documentation
-You can find the documentation [here](https://immichframe.online).
-
 ### 🎬 Video Branch Features
 
 > **Note**: This branch includes enhanced features not available in the main branch.
+
+**Usage of this FORK:**
+
+build a docker-compose.yml with following content:
+```
+name: immichframe
+services:
+  immichframe:
+    container_name: immichframe
+    image: jayar79/immichframe:test
+#or (not yet implemented)
+#jayar79/immichframe:prod
+#or (not yet implemented)
+#jayar79/immichframe:dev
+#this is the original
+#ghcr.io/immichframe/immichframe:latest
+    restart: on-failure
+    volumes:
+      - ./Config:/app/Config
+      - ./Config/custom.css:/app/wwwroot/static/custom.css
+      - ./Config/test.txt:/app/wwwroot/static/test.txt
+    ports:
+      - "2284:8080"
+```
 
 #### 🆕 New Features in Video Branch:
 
