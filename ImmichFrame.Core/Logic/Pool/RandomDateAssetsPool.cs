@@ -441,7 +441,7 @@ public class RandomDateAssetsPool : IAssetPool
             {
                 TakenAfter = startDate,
                 TakenBefore = endDate,
-                Size = Math.Max(_assetsPerRandomDate * 4, 100), // Request more to account for deduplication
+                Size = Math.Max(_assetsPerRandomDate * 4, 1000), // Request more to account for deduplication
                 Page = 1,
                 Type = GetSearchAssetType(),
                 WithExif = true,
@@ -596,7 +596,7 @@ public class RandomDateAssetsPool : IAssetPool
         {
             var searchDto = new MetadataSearchDto
             {
-                Size = Math.Max(400, _requestedAssetCount * 6), // Request more to account for deduplication
+                Size = Math.Max(1000, _requestedAssetCount * 6), // Request more to account for deduplication
                 Page = 1,
                 Type = GetSearchAssetType(),
                 WithExif = true,
