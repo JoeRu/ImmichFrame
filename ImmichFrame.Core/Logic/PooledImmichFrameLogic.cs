@@ -36,6 +36,14 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
     private IAssetPool BuildPool(IAccountSettings accountSettings)
     {
         IAssetPool basePool;
+
+                // Prefer actual chronological pool if enabled 
+        if (_generalSettings.ChronologicalImagesCount > 0)
+        {
+            var randomDatePool = new RandomDateAssetsPool(_apiCache, _immichApi, AccountSettings);
+            randomDatePool.ConfigureAssetsPerRandomDate(_generalSettings.ChronologicalImagesCount);
+            return new ChronologicalAssetsPoolWrapper(randomDatePool, _generalSettings);
+        }
         
         if (!accountSettings.ShowFavorites && !accountSettings.ShowMemories && !accountSettings.Albums.Any() && !accountSettings.People.Any())
         {
@@ -58,14 +66,6 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
                 pools.Add(new PersonAssetsPool(_apiCache, _immichApi, accountSettings));
 
             basePool = new MultiAssetPool(pools);
-        }
-        
-        // Prefer actual chronological pool if enabled 
-        if (_generalSettings.ChronologicalImagesCount > 0)
-        {
-            var randomDatePool = new RandomDateAssetsPool(_apiCache, _immichApi, AccountSettings);
-            randomDatePool.ConfigureAssetsPerRandomDate(_generalSettings.ChronologicalImagesCount);
-            return new ChronologicalAssetsPoolWrapper(randomDatePool, _generalSettings);
         }
         
         return basePool;

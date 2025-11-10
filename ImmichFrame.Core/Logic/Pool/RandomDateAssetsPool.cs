@@ -445,8 +445,8 @@ public class RandomDateAssetsPool : IAssetPool
                 Page = 1,
                 Type = GetSearchAssetType(),
                 WithExif = true,
-                Visibility = accountSettings.ShowArchived ? AssetVisibility.Archive : AssetVisibility.Timeline,
-                Order = AssetOrder.Desc
+                Visibility = accountSettings.ShowArchived ? AssetVisibility.Archive : AssetVisibility.Timeline
+                // Removed Order to eliminate bias toward newer photos within date ranges
             };
 
             // Query the API for assets in the requested range
@@ -600,8 +600,8 @@ public class RandomDateAssetsPool : IAssetPool
                 Page = 1,
                 Type = GetSearchAssetType(),
                 WithExif = true,
-                Visibility = accountSettings.ShowArchived ? AssetVisibility.Archive : AssetVisibility.Timeline,
-                Order = AssetOrder.Desc
+                Visibility = accountSettings.ShowArchived ? AssetVisibility.Archive : AssetVisibility.Timeline
+                // Removed Order to eliminate bias toward newest photos in fallback selection
             };
 
             // Query the API and then randomize to provide visual variety
