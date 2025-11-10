@@ -60,7 +60,7 @@
 	{$configStore.style == 'blur' ? 'backdrop-blur-lg rounded-tr-2xl' : ''}	
 	drop-shadow-2xl p-3"
 >
-	<p id="clockdate" class="mt-2 text-sm sm:text-sm md:text-md lg:text-xl font-thin text-shadow-sm">
+	<p id="clockdate" class="mt-2 text-sm sm:text-sm md:text-md lg:text-xl font-normal text-shadow-sm">
 		{formattedDate()}
 	</p>
 	<p
