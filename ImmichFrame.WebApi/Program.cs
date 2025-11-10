@@ -2,6 +2,7 @@ using ImmichFrame.Core.Helpers;
 using ImmichFrame.Core.Interfaces;
 using ImmichFrame.WebApi.Models;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.OpenApi.Models;
 using System.Reflection;
 using ImmichFrame.Core.Logic;
 using ImmichFrame.Core.Logic.AccountSelection;
@@ -70,7 +71,15 @@ builder.Services.AddSingleton<IImmichFrameLogic, MultiImmichFrameLogicDelegate>(
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "ImmichFrame API",
+        Version = "v1",
+        Description = "API for ImmichFrame digital photo frame application"
+    });
+});
 
 builder.Services.AddAuthorization(options => { options.AddPolicy("AllowAnonymous", policy => policy.RequireAssertion(context => true)); });
 
@@ -83,7 +92,10 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "ImmichFrame API v1");
+    });
 }
 
 app.UseStaticFiles();
