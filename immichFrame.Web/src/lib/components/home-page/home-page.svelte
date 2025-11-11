@@ -251,6 +251,17 @@
 		try {
 			let extractedColor: ExtractedColor;
 			
+			// Prepare color extraction options with fallback from configuration
+			const extractionOptions = {
+				fallbackColor: $configStore.primaryColor || '#f5deb3',
+				analyzePortraitVideo: true,
+				sampleLowerThird: true,
+				handleSplitView: displayingAssets.length === 2,
+				minSaturation: 0.2,
+				minLuminance: 0.15,
+				maxDarkness: 0.7
+			};
+			
 			if (isVideo(primaryAsset)) {
 				// For videos, we'll extract from the video element once it's loaded
 				// This will be called from the video component when ready
@@ -261,14 +272,26 @@
 				if (imagePromise) {
 					const [imageUrl] = await imagePromise;
 					if (imageUrl) {
-						extractedColor = await extractColorFromImageUrl(imageUrl);
+						extractedColor = await extractColorFromImageUrl(imageUrl, extractionOptions);
 						updateThemeColors(extractedColor);
 					}
 				}
 			}
 		} catch (error) {
 			console.warn('Failed to extract color from asset:', error);
-			// Keep existing theme if extraction fails
+			
+			// Fallback to configuration primary color if extraction fails
+			if ($configStore.primaryColor) {
+				try {
+					const fallbackExtractedColor = await extractColorFromImageUrl('', {
+						fallbackColor: $configStore.primaryColor,
+						useFallbackOnly: true
+					});
+					updateThemeColors(fallbackExtractedColor);
+				} catch (fallbackError) {
+					console.warn('Failed to use fallback color:', fallbackError);
+				}
+			}
 		}
 	}
 
@@ -318,10 +341,34 @@
 	 */
 	function extractVideoColor(videoElement: HTMLVideoElement) {
 		try {
-			const extractedColor = extractColorFromVideo(videoElement);
+			// Prepare color extraction options with fallback from configuration
+			const extractionOptions = {
+				fallbackColor: $configStore.primaryColor || '#f5deb3',
+				analyzePortraitVideo: true,
+				sampleLowerThird: true,
+				handleSplitView: displayingAssets.length === 2,
+				minSaturation: 0.2,
+				minLuminance: 0.15,
+				maxDarkness: 0.7
+			};
+			
+			const extractedColor = extractColorFromVideo(videoElement, extractionOptions);
 			updateThemeColors(extractedColor);
 		} catch (error) {
 			console.warn('Failed to extract color from video:', error);
+			
+			// Fallback to configuration primary color if extraction fails
+			if ($configStore.primaryColor) {
+				try {
+					const fallbackExtractedColor = extractColorFromVideo(videoElement, {
+						fallbackColor: $configStore.primaryColor,
+						useFallbackOnly: true
+					});
+					updateThemeColors(fallbackExtractedColor);
+				} catch (fallbackError) {
+					console.warn('Failed to use fallback color for video:', fallbackError);
+				}
+			}
 		}
 	}
 

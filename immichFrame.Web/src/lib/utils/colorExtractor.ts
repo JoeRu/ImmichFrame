@@ -8,23 +8,51 @@ export interface ExtractedColor {
 	luminance: number;
 }
 
+export interface ColorExtractionOptions {
+	sampleSize?: number;
+	fallbackColor?: string;
+	sampleLowerThird?: boolean;
+	analyzePortraitVideo?: boolean;
+	handleSplitView?: boolean;
+	ignoreBlackBackground?: boolean;
+	enableContrastBoost?: boolean;
+	minSaturation?: number;
+	maxSaturation?: number;
+	minLuminance?: number;
+	maxLuminance?: number;
+	maxDarkness?: number;
+	useFallbackOnly?: boolean;
+}
+
 /**
- * Extract dominant color from an image element or canvas
+ * Extract dominant color from an image element or canvas with enhanced algorithms
+ * Addresses issues: dark colors, lower third sampling, portrait video backgrounds, 
+ * split-view handling, contrast optimization, and fallback integration
  */
 export function extractDominantColor(
 	element: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
-	sampleSize: number = 50
+	options: ColorExtractionOptions = {}
 ): ExtractedColor {
+	const {
+		sampleSize = 50,
+		fallbackColor = '#4a5568',
+		sampleLowerThird = true,
+		analyzePortraitVideo = true,
+		handleSplitView = true,
+		ignoreBlackBackground = true,
+		enableContrastBoost = true,
+		minSaturation = 0.15,
+		maxSaturation = 1.0,
+		minLuminance = 0.2,  // Increased to avoid overly dark colors
+		maxLuminance = 0.85, // Slightly increased for better balance
+		maxDarkness = 0.7
+	} = options;
+
 	const canvas = document.createElement('canvas');
 	const ctx = canvas.getContext('2d');
 	
 	if (!ctx) {
-		// Fallback to a neutral color if canvas context is not available
-		return {
-			hex: '#4a5568',
-			rgb: [74, 85, 104],
-			luminance: 0.3
-		};
+		return createFallbackColor(fallbackColor);
 	}
 
 	// Set canvas size for sampling
@@ -32,29 +60,70 @@ export function extractDominantColor(
 	canvas.height = sampleSize;
 
 	try {
-		// Draw the element to canvas for color analysis
-		if (element instanceof HTMLVideoElement) {
+		// Determine element type and aspect ratio for specialized handling
+		let isPortraitVideo = false;
+		let isSplitView = false;
+		
+		if (element instanceof HTMLVideoElement && analyzePortraitVideo) {
+			const aspectRatio = element.videoWidth / element.videoHeight;
+			isPortraitVideo = aspectRatio < 1;
+			// Draw video to canvas
 			ctx.drawImage(element, 0, 0, sampleSize, sampleSize);
 		} else if (element instanceof HTMLImageElement) {
 			// Ensure image is loaded before drawing
 			if (!element.complete || element.naturalHeight === 0) {
 				throw new Error('Image not loaded');
 			}
+			
+			const aspectRatio = element.naturalWidth / element.naturalHeight;
+			// Detect split-view (very wide images that might have different content on left/right)
+			if (handleSplitView) {
+				isSplitView = aspectRatio > 2.5;
+			}
+			
 			ctx.drawImage(element, 0, 0, sampleSize, sampleSize);
 		} else {
 			// Canvas element
 			ctx.drawImage(element, 0, 0, sampleSize, sampleSize);
 		}
 
-		// Get image data
-		const imageData = ctx.getImageData(0, 0, sampleSize, sampleSize);
+		// Get image data with focused sampling region
+		let imageData: ImageData;
+		
+		if (isPortraitVideo && ignoreBlackBackground) {
+			// For portrait videos, sample center region to avoid black bars
+			const centerWidth = Math.floor(sampleSize * 0.6);
+			const centerHeight = Math.floor(sampleSize * 0.8);
+			const offsetX = Math.floor((sampleSize - centerWidth) / 2);
+			const offsetY = Math.floor((sampleSize - centerHeight) / 2);
+			
+			imageData = ctx.getImageData(offsetX, offsetY, centerWidth, centerHeight);
+		} else if (isSplitView && handleSplitView) {
+			// For split-view, sample both halves and blend results
+			return extractFromSplitView(ctx, sampleSize, options);
+		} else if (sampleLowerThird) {
+			// Standard case: focus on lower third of the image
+			const lowerThirdStart = Math.floor(sampleSize * 0.67); // Start at 2/3 down
+			const lowerThirdHeight = sampleSize - lowerThirdStart;
+			
+			imageData = ctx.getImageData(0, lowerThirdStart, sampleSize, lowerThirdHeight);
+		} else {
+			// Full image sampling
+			imageData = ctx.getImageData(0, 0, sampleSize, sampleSize);
+		}
+
 		const data = imageData.data;
 
-		// Color frequency map
-		const colorMap = new Map<string, { count: number; rgb: [number, number, number] }>();
+		// Enhanced color frequency analysis
+		const colorMap = new Map<string, { 
+			count: number; 
+			rgb: [number, number, number];
+			luminance: number;
+			saturation: number;
+		}>();
 
-		// Sample pixels and count color frequencies
-		for (let i = 0; i < data.length; i += 16) { // Sample every 4th pixel for performance
+		// Sample pixels with improved quantization
+		for (let i = 0; i < data.length; i += 16) { // Sample every 4th pixel
 			const r = data[i];
 			const g = data[i + 1];
 			const b = data[i + 2];
@@ -62,12 +131,18 @@ export function extractDominantColor(
 
 			// Skip transparent or near-transparent pixels
 			if (alpha < 128) continue;
+			
+			// Skip near-black pixels if ignoreBlackBackground is enabled
+			if (ignoreBlackBackground && r < 30 && g < 30 && b < 30) continue;
 
-			// Quantize colors to reduce noise (group similar colors)
-			const quantizedR = Math.floor(r / 32) * 32;
-			const quantizedG = Math.floor(g / 32) * 32;
-			const quantizedB = Math.floor(b / 32) * 32;
+			// Improved quantization with better color grouping
+			const quantizedR = Math.floor(r / 24) * 24; // Finer quantization for better color detection
+			const quantizedG = Math.floor(g / 24) * 24;
+			const quantizedB = Math.floor(b / 24) * 24;
 
+			const luminance = getLuminance(quantizedR, quantizedG, quantizedB);
+			const saturation = calculateSaturation(quantizedR, quantizedG, quantizedB);
+			
 			const key = `${quantizedR},${quantizedG},${quantizedB}`;
 			
 			if (colorMap.has(key)) {
@@ -75,65 +150,315 @@ export function extractDominantColor(
 			} else {
 				colorMap.set(key, { 
 					count: 1, 
-					rgb: [quantizedR, quantizedG, quantizedB] 
+					rgb: [quantizedR, quantizedG, quantizedB],
+					luminance,
+					saturation
 				});
 			}
 		}
 
-		// Find the most frequent color (excluding very dark/light colors for better theming)
-		let dominantColor = { count: 0, rgb: [74, 85, 104] as [number, number, number] };
+		// Enhanced color selection algorithm
+		let bestColor = findOptimalColor(colorMap, minLuminance, maxLuminance, enableContrastBoost);
 		
-		for (const [_, colorData] of colorMap) {
-			const [r, g, b] = colorData.rgb;
-			const luminance = getLuminance(r, g, b);
-			
-			// Prefer colors that aren't too dark or too light for better UI theming
-			if (luminance > 0.1 && luminance < 0.8 && colorData.count > dominantColor.count) {
-				dominantColor = colorData;
-			}
+		// If no suitable color found, try with relaxed constraints
+		if (!bestColor) {
+			bestColor = findOptimalColor(colorMap, 0.1, 0.9, enableContrastBoost);
 		}
-
-		// If no suitable color found, find any dominant color
-		if (dominantColor.count === 0) {
+		
+		// Final fallback to most frequent color
+		if (!bestColor) {
+			let maxCount = 0;
 			for (const [_, colorData] of colorMap) {
-				if (colorData.count > dominantColor.count) {
-					dominantColor = colorData;
+				if (colorData.count > maxCount) {
+					maxCount = colorData.count;
+					bestColor = colorData;
 				}
 			}
 		}
 
-		const [r, g, b] = dominantColor.rgb;
-		const hex = rgbToHex(r, g, b);
-		const luminance = getLuminance(r, g, b);
+		if (bestColor) {
+			const [r, g, b] = bestColor.rgb;
+			
+			// Apply contrast boost if enabled and color is too dark
+			let finalRgb: [number, number, number] = [r, g, b];
+			if (enableContrastBoost && bestColor.luminance < 0.3) {
+				finalRgb = boostColorBrightness(r, g, b, 0.4);
+			}
+			
+			const hex = rgbToHex(finalRgb[0], finalRgb[1], finalRgb[2]);
+			const luminance = getLuminance(finalRgb[0], finalRgb[1], finalRgb[2]);
 
-		return {
-			hex,
-			rgb: [r, g, b],
-			luminance
-		};
+			return {
+				hex,
+				rgb: finalRgb,
+				luminance
+			};
+		}
+
+		// Final fallback
+		return createFallbackColor(fallbackColor);
 
 	} catch (error) {
 		console.warn('Color extraction failed:', error);
-		// Return a fallback color
-		return {
-			hex: '#4a5568',
-			rgb: [74, 85, 104],
-			luminance: 0.3
-		};
+		return createFallbackColor(fallbackColor);
 	}
 }
 
 /**
- * Extract color from image URL by creating a temporary image element
+ * Create a fallback color from hex string with proper luminance calculation
  */
-export function extractColorFromImageUrl(imageUrl: string): Promise<ExtractedColor> {
+function createFallbackColor(fallbackHex: string): ExtractedColor {
+	const rgb = hexToRgb(fallbackHex);
+	if (!rgb) {
+		// Ultimate fallback
+		return {
+			hex: '#6b7280',
+			rgb: [107, 114, 128],
+			luminance: 0.4
+		};
+	}
+	
+	return {
+		hex: fallbackHex,
+		rgb: [rgb.r, rgb.g, rgb.b],
+		luminance: getLuminance(rgb.r, rgb.g, rgb.b)
+	};
+}
+
+/**
+ * Convert hex color string to RGB object
+ */
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+	const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+	return result ? {
+		r: parseInt(result[1], 16),
+		g: parseInt(result[2], 16),
+		b: parseInt(result[3], 16)
+	} : null;
+}
+
+/**
+ * Handle split-view images by sampling both halves and choosing the better color
+ */
+function extractFromSplitView(
+	ctx: CanvasRenderingContext2D, 
+	sampleSize: number, 
+	options: ColorExtractionOptions
+): ExtractedColor {
+	const halfWidth = Math.floor(sampleSize / 2);
+	
+	// Sample left half (focus on lower third)
+	const leftLowerThird = Math.floor(sampleSize * 0.67);
+	const leftData = ctx.getImageData(0, leftLowerThird, halfWidth, sampleSize - leftLowerThird);
+	
+	// Sample right half (focus on lower third) 
+	const rightData = ctx.getImageData(halfWidth, leftLowerThird, halfWidth, sampleSize - leftLowerThird);
+	
+	// Extract colors from both halves
+	const leftColors = analyzeImageData(leftData, options);
+	const rightColors = analyzeImageData(rightData, options);
+	
+	// Choose the more vibrant/suitable color
+	const leftBest = findOptimalColor(leftColors, options.minLuminance ?? 0.2, options.maxLuminance ?? 0.85, options.enableContrastBoost ?? true);
+	const rightBest = findOptimalColor(rightColors, options.minLuminance ?? 0.2, options.maxLuminance ?? 0.85, options.enableContrastBoost ?? true);
+	
+	// Prefer the color with better saturation and luminance balance
+	if (leftBest && rightBest) {
+		const leftScore = leftBest.saturation * 0.6 + (1 - Math.abs(leftBest.luminance - 0.5)) * 0.4;
+		const rightScore = rightBest.saturation * 0.6 + (1 - Math.abs(rightBest.luminance - 0.5)) * 0.4;
+		
+		const winner = leftScore > rightScore ? leftBest : rightBest;
+		const [r, g, b] = winner.rgb;
+		
+		return {
+			hex: rgbToHex(r, g, b),
+			rgb: [r, g, b],
+			luminance: winner.luminance
+		};
+	}
+	
+	// Fallback to single best color or default
+	const bestColor = leftBest || rightBest;
+	if (bestColor) {
+		const [r, g, b] = bestColor.rgb;
+		return {
+			hex: rgbToHex(r, g, b),
+			rgb: [r, g, b],
+			luminance: bestColor.luminance
+		};
+	}
+	
+	return createFallbackColor(options.fallbackColor ?? '#4a5568');
+}
+
+/**
+ * Analyze ImageData and return color frequency map
+ */
+function analyzeImageData(
+	imageData: ImageData, 
+	options: ColorExtractionOptions
+): Map<string, { count: number; rgb: [number, number, number]; luminance: number; saturation: number }> {
+	const colorMap = new Map<string, { 
+		count: number; 
+		rgb: [number, number, number];
+		luminance: number;
+		saturation: number;
+	}>();
+	
+	const data = imageData.data;
+	const ignoreBlackBackground = options.ignoreBlackBackground ?? true;
+	
+	for (let i = 0; i < data.length; i += 16) { // Sample every 4th pixel
+		const r = data[i];
+		const g = data[i + 1];
+		const b = data[i + 2];
+		const alpha = data[i + 3];
+
+		// Skip transparent or near-transparent pixels
+		if (alpha < 128) continue;
+		
+		// Skip near-black pixels if ignoreBlackBackground is enabled
+		if (ignoreBlackBackground && r < 30 && g < 30 && b < 30) continue;
+
+		// Improved quantization
+		const quantizedR = Math.floor(r / 24) * 24;
+		const quantizedG = Math.floor(g / 24) * 24;
+		const quantizedB = Math.floor(b / 24) * 24;
+
+		const luminance = getLuminance(quantizedR, quantizedG, quantizedB);
+		const saturation = calculateSaturation(quantizedR, quantizedG, quantizedB);
+		
+		const key = `${quantizedR},${quantizedG},${quantizedB}`;
+		
+		if (colorMap.has(key)) {
+			colorMap.get(key)!.count++;
+		} else {
+			colorMap.set(key, { 
+				count: 1, 
+				rgb: [quantizedR, quantizedG, quantizedB],
+				luminance,
+				saturation
+			});
+		}
+	}
+	
+	return colorMap;
+}
+
+/**
+ * Calculate color saturation from RGB values
+ */
+function calculateSaturation(r: number, g: number, b: number): number {
+	const max = Math.max(r, g, b) / 255;
+	const min = Math.min(r, g, b) / 255;
+	const delta = max - min;
+	
+	if (max === 0) return 0;
+	return delta / max;
+}
+
+/**
+ * Find the optimal color from the frequency map based on various criteria
+ */
+function findOptimalColor(
+	colorMap: Map<string, { count: number; rgb: [number, number, number]; luminance: number; saturation: number }>,
+	minLuminance: number,
+	maxLuminance: number,
+	enableContrastBoost: boolean
+): { count: number; rgb: [number, number, number]; luminance: number; saturation: number } | null {
+	let bestColor: { count: number; rgb: [number, number, number]; luminance: number; saturation: number } | null = null;
+	let bestScore = 0;
+	
+	for (const [_, colorData] of colorMap) {
+		const { luminance, saturation, count } = colorData;
+		
+		// Skip colors outside luminance range
+		if (luminance < minLuminance || luminance > maxLuminance) continue;
+		
+		// Calculate composite score based on:
+		// - Frequency (how common the color is)
+		// - Saturation (more vibrant colors preferred)
+		// - Luminance balance (colors closer to mid-range preferred)
+		// - Avoid overly dark colors
+		
+		const frequencyScore = Math.min(count / 10, 1); // Normalize frequency
+		const saturationScore = Math.min(saturation * 1.5, 1); // Boost saturation importance
+		const luminanceScore = 1 - Math.abs(luminance - 0.5); // Prefer mid-range luminance
+		const darknessBonus = luminance > 0.25 ? 1.2 : 1; // Bonus for avoiding very dark colors
+		
+		const totalScore = (frequencyScore * 0.4 + saturationScore * 0.3 + luminanceScore * 0.3) * darknessBonus;
+		
+		if (totalScore > bestScore) {
+			bestScore = totalScore;
+			bestColor = colorData;
+		}
+	}
+	
+	return bestColor;
+}
+
+/**
+ * Boost the brightness of a color while maintaining its hue
+ */
+function boostColorBrightness(r: number, g: number, b: number, targetLuminance: number): [number, number, number] {
+	// Convert to HSL for easier brightness manipulation
+	const hsl = rgbToHsl(r, g, b);
+	
+	// Increase lightness while preserving hue and saturation
+	hsl[2] = Math.max(hsl[2], targetLuminance);
+	
+	// Convert back to RGB
+	const boostedRgb = hslToRgb(hsl[0], hsl[1], hsl[2]);
+	
+	return [
+		Math.min(255, Math.max(0, boostedRgb[0])),
+		Math.min(255, Math.max(0, boostedRgb[1])),
+		Math.min(255, Math.max(0, boostedRgb[2]))
+	];
+}
+
+/**
+ * Extract color from image URL by creating a temporary image element
+ * Now supports enhanced options including fallback color integration
+ */
+export function extractColorFromImageUrl(imageUrl: string, options: ColorExtractionOptions = {}): Promise<ExtractedColor> {
 	return new Promise((resolve, reject) => {
+		// Handle fallback-only mode
+		if (options.useFallbackOnly && options.fallbackColor) {
+			try {
+				const fallbackColor = createFallbackColor(options.fallbackColor);
+				resolve(fallbackColor);
+				return;
+			} catch (error) {
+				reject(error);
+				return;
+			}
+		}
+		
+		// Handle empty URL with fallback
+		if (!imageUrl && options.fallbackColor) {
+			try {
+				const fallbackColor = createFallbackColor(options.fallbackColor);
+				resolve(fallbackColor);
+				return;
+			} catch (error) {
+				reject(error);
+				return;
+			}
+		}
+		
 		const img = new Image();
 		img.crossOrigin = 'anonymous';
 		
 		img.onload = () => {
 			try {
-				const color = extractDominantColor(img);
+				const extractionOptions: ColorExtractionOptions = {
+					fallbackColor: options.fallbackColor || '#6b7280',
+					enableContrastBoost: true,
+					ignoreBlackBackground: true,
+					...options
+				};
+				const color = extractDominantColor(img, extractionOptions);
 				resolve(color);
 			} catch (error) {
 				reject(error);
@@ -141,7 +466,16 @@ export function extractColorFromImageUrl(imageUrl: string): Promise<ExtractedCol
 		};
 		
 		img.onerror = () => {
-			reject(new Error('Failed to load image for color extraction'));
+			if (options.fallbackColor) {
+				try {
+					const fallbackColor = createFallbackColor(options.fallbackColor);
+					resolve(fallbackColor);
+				} catch (error) {
+					reject(error);
+				}
+			} else {
+				reject(new Error('Failed to load image for color extraction'));
+			}
 		};
 		
 		img.src = imageUrl;
@@ -150,19 +484,31 @@ export function extractColorFromImageUrl(imageUrl: string): Promise<ExtractedCol
 
 /**
  * Extract color from video element at current time
+ * Enhanced to handle portrait videos and black backgrounds properly with full options support
  */
-export function extractColorFromVideo(videoElement: HTMLVideoElement): ExtractedColor {
+export function extractColorFromVideo(videoElement: HTMLVideoElement, options: ColorExtractionOptions = {}): ExtractedColor {
+	// Handle fallback-only mode
+	if (options.useFallbackOnly && options.fallbackColor) {
+		return createFallbackColor(options.fallbackColor);
+	}
+	
 	// Ensure video is ready for color extraction
 	if (videoElement.readyState < 2) {
 		// Video metadata not loaded yet, return fallback
-		return {
-			hex: '#4a5568',
-			rgb: [74, 85, 104],
-			luminance: 0.3
-		};
+		return createFallbackColor(options.fallbackColor || '#4a5568');
 	}
 	
-	return extractDominantColor(videoElement);
+	const extractionOptions: ColorExtractionOptions = {
+		fallbackColor: options.fallbackColor || '#4a5568',
+		enableContrastBoost: true,
+		ignoreBlackBackground: true, // Important for portrait videos
+		minLuminance: 0.25, // Slightly higher for videos to avoid dark colors
+		maxLuminance: 0.8,
+		analyzePortraitVideo: true,
+		...options
+	};
+	
+	return extractDominantColor(videoElement, extractionOptions);
 }
 
 /**
