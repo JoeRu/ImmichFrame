@@ -372,21 +372,30 @@ function findOptimalColor(
 	for (const [_, colorData] of colorMap) {
 		const { luminance, saturation, count } = colorData;
 		
-		// Skip colors outside luminance range
-		if (luminance < minLuminance || luminance > maxLuminance) continue;
+		// Calculate luminance penalty for colors outside preferred range
+		// Instead of skipping them entirely, we apply a penalty but still consider them
+		let luminancePenalty = 1.0;
+		if (luminance < minLuminance) {
+			// Penalty for too-dark colors (but don't exclude them completely)
+			luminancePenalty = 0.6 + (luminance / minLuminance) * 0.4;
+		} else if (luminance > maxLuminance) {
+			// Penalty for too-bright colors (but don't exclude them completely)
+			const excessBrightness = (luminance - maxLuminance) / (1.0 - maxLuminance);
+			luminancePenalty = 0.6 + (1 - excessBrightness) * 0.4;
+		}
 		
 		// Calculate composite score based on:
 		// - Frequency (how common the color is)
 		// - Saturation (more vibrant colors preferred)
 		// - Luminance balance (colors closer to mid-range preferred)
-		// - Avoid overly dark colors
+		// - Luminance penalty (for colors outside preferred range)
 		
 		const frequencyScore = Math.min(count / 10, 1); // Normalize frequency
 		const saturationScore = Math.min(saturation * 1.5, 1); // Boost saturation importance
 		const luminanceScore = 1 - Math.abs(luminance - 0.5); // Prefer mid-range luminance
 		const darknessBonus = luminance > 0.25 ? 1.2 : 1; // Bonus for avoiding very dark colors
 		
-		const totalScore = (frequencyScore * 0.4 + saturationScore * 0.3 + luminanceScore * 0.3) * darknessBonus;
+		const totalScore = (frequencyScore * 0.4 + saturationScore * 0.3 + luminanceScore * 0.3) * darknessBonus * luminancePenalty;
 		
 		if (totalScore > bestScore) {
 			bestScore = totalScore;
@@ -582,6 +591,7 @@ export function generateTextColor(backgroundColor: string): string {
 
 /**
  * Generate a complementary color that's suitable for UI theming
+ * Ensures sufficient contrast against transparent black backgrounds (typical for info boxes)
  */
 export function generateComplementaryColor(baseColor: ExtractedColor): ExtractedColor {
 	const [r, g, b] = baseColor.rgb;
@@ -592,23 +602,52 @@ export function generateComplementaryColor(baseColor: ExtractedColor): Extracted
 	// Generate complementary color by rotating hue 180 degrees
 	let complementaryHue = (hsl[0] + 180) % 360;
 	
-	// Adjust saturation and lightness for better UI suitability
-	let saturation = Math.max(0.3, Math.min(0.7, hsl[1])); // Keep saturation between 30-70%
+	// Adjust saturation for vibrant but not overwhelming colors
+	let saturation = Math.max(0.35, Math.min(0.65, hsl[1])); // Keep saturation between 35-65%
 	let lightness = hsl[2];
 	
-	// Ensure good contrast - if original is dark, make complement lighter and vice versa
+	// Critical: Ensure sufficient lightness for readability on dark/transparent black backgrounds
+	// Info boxes typically have bg-black/20 to bg-black/40, so we need bright complementary colors
+	
+	// Calculate minimum lightness needed for WCAG AA contrast (4.5:1) against dark backgrounds
+	const minLightnessForDarkBg = 0.55; // ~55% lightness ensures readability
+	const targetLightnessForOptimal = 0.70; // ~70% lightness for optimal contrast
+	
 	if (baseColor.luminance < 0.3) {
-		lightness = Math.max(0.4, lightness);
+		// Dark base color -> ensure complement is bright enough for dark backgrounds
+		lightness = Math.max(targetLightnessForOptimal, lightness);
+	} else if (baseColor.luminance < 0.5) {
+		// Medium-dark base color -> moderately bright complement
+		lightness = Math.max(minLightnessForDarkBg, lightness);
 	} else if (baseColor.luminance > 0.7) {
-		lightness = Math.min(0.6, lightness);
+		// Bright base color -> complement can be slightly darker but still readable
+		lightness = Math.max(minLightnessForDarkBg, Math.min(0.65, lightness));
+	} else {
+		// Medium base color -> ensure complement is bright enough
+		lightness = Math.max(minLightnessForDarkBg, lightness);
 	}
 	
+	// Convert back to RGB
 	const [cr, cg, cb] = hslToRgb(complementaryHue, saturation, lightness);
+	
+	// Calculate the actual luminance
+	const complementaryLuminance = getLuminance(cr, cg, cb);
+	
+	// Final safety check: If luminance is still too low, boost it directly
+	if (complementaryLuminance < 0.45) {
+		// Boost brightness while preserving hue
+		const boostedRgb = boostColorBrightness(cr, cg, cb, 0.55);
+		return {
+			hex: rgbToHex(boostedRgb[0], boostedRgb[1], boostedRgb[2]),
+			rgb: boostedRgb,
+			luminance: getLuminance(boostedRgb[0], boostedRgb[1], boostedRgb[2])
+		};
+	}
 	
 	return {
 		hex: rgbToHex(cr, cg, cb),
 		rgb: [cr, cg, cb],
-		luminance: getLuminance(cr, cg, cb)
+		luminance: complementaryLuminance
 	};
 }
 
