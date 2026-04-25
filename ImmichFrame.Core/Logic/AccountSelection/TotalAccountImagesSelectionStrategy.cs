@@ -60,7 +60,7 @@ public class TotalAccountImagesSelectionStrategy(ILogger<TotalAccountImagesSelec
                 var (task, account, proportion) = tuple;
                 var assets = (await task).ToList();
                 _logger.LogDebug("Retrieved {total} asset(s) for account [{account}], will take {proportion}%", assets.Count(), account, proportion * 100);
-                return (account, assets.Shuffle().TakeProportional(proportion));
+                return (account, assets.TakeProportional(proportion));
             });
 
         var accountAssetTupleList = await Task.WhenAll(taskList);

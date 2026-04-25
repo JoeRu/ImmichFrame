@@ -42,7 +42,9 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
 
         if (!accountSettings.ShowFavorites && !accountSettings.ShowMemories && !hasAlbums && !hasPeople && !hasTags)
         {
-            return new AllAssetsPool(_apiCache, _immichApi, accountSettings);
+            var randomDatePool = new RandomDateAssetsPool(_apiCache, _immichApi, accountSettings);
+            randomDatePool.ConfigureAssetsPerRandomDate(3);
+            return new ChronologicalAssetsPoolWrapper(randomDatePool);
         }
 
         var pools = new List<IAssetPool>();
