@@ -39,30 +39,37 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
         var hasAlbums = accountSettings.Albums?.Any() ?? false;
         var hasPeople = accountSettings.People?.Any() ?? false;
         var hasTags = accountSettings.Tags?.Any() ?? false;
+        IAssetPool basePool;
 
         if (!accountSettings.ShowFavorites && !accountSettings.ShowMemories && !hasAlbums && !hasPeople && !hasTags)
         {
-            return new AllAssetsPool(_apiCache, _immichApi, accountSettings);
+            basePool = new AllAssetsPool(_apiCache, _immichApi, accountSettings);
+        }
+        else
+        {
+            var pools = new List<IAssetPool>();
+
+            if (accountSettings.ShowFavorites)
+                pools.Add(new FavoriteAssetsPool(_apiCache, _immichApi, accountSettings));
+
+            if (accountSettings.ShowMemories)
+                pools.Add(new MemoryAssetsPool(_immichApi, accountSettings));
+
+            if (hasAlbums)
+                pools.Add(new AlbumAssetsPool(_apiCache, _immichApi, accountSettings));
+
+            if (hasPeople)
+                pools.Add(new PersonAssetsPool(_apiCache, _immichApi, accountSettings));
+
+            if (hasTags)
+                pools.Add(new TagAssetsPool(_apiCache, _immichApi, accountSettings));
+
+            basePool = new MultiAssetPool(pools);
         }
 
-        var pools = new List<IAssetPool>();
-
-        if (accountSettings.ShowFavorites)
-            pools.Add(new FavoriteAssetsPool(_apiCache, _immichApi, accountSettings));
-
-        if (accountSettings.ShowMemories)
-            pools.Add(new MemoryAssetsPool(_immichApi, accountSettings));
-
-        if (hasAlbums)
-            pools.Add(new AlbumAssetsPool(_apiCache, _immichApi, accountSettings));
-
-        if (hasPeople)
-            pools.Add(new PersonAssetsPool(_apiCache, _immichApi, accountSettings));
-
-        if (hasTags)
-            pools.Add(new TagAssetsPool(_apiCache, _immichApi, accountSettings));
-
-        return new MultiAssetPool(pools);
+        return _generalSettings.ChronologicalImagesCount > 0
+            ? new ChronologicalAssetsPoolWrapper(basePool, _generalSettings)
+            : basePool;
     }
 
     public async Task<AssetResponseDto?> GetNextAsset()

@@ -35,6 +35,7 @@
     "ImagePan": true,
     "ImageFill": true,
     "PlayAudio": true,
+    "ChronologicalImagesCount": 7,
     "Layout": "Layout_TEST"
   },
   "Accounts": [

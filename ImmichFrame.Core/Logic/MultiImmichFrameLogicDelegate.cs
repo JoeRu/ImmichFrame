@@ -32,7 +32,11 @@ public class MultiImmichFrameLogicDelegate : IImmichFrameLogic
 
 
     public async Task<IEnumerable<AssetResponseDto>> GetAssets()
-        => (await _accountSelectionStrategy.GetAssets()).Shuffle().Select(it => it.ToAsset());
+    {
+        var assets = (await _accountSelectionStrategy.GetAssets()).ToList();
+        return (_serverSettings.GeneralSettings.ChronologicalImagesCount > 0 ? assets : assets.Shuffle())
+            .Select(it => it.ToAsset());
+    }
 
 
     public Task<AssetResponseDto> GetAssetInfoById(Guid assetId)

@@ -31,6 +31,7 @@ public class ClientSettingsDto
     public bool ImageFill { get; set; }
     public bool PlayAudio { get; set; }
     public string Layout { get; set; }
+    public int ChronologicalImagesCount { get; set; }
     public string Language { get; set; }
 
     public static ClientSettingsDto FromGeneralSettings(IGeneralSettings generalSettings)
@@ -63,6 +64,7 @@ public class ClientSettingsDto
         dto.ImageFill = generalSettings.ImageFill;
         dto.PlayAudio = generalSettings.PlayAudio;
         dto.Layout = generalSettings.Layout;
+        dto.ChronologicalImagesCount = generalSettings.ChronologicalImagesCount;
         dto.Language = generalSettings.Language;
         return dto;
     }
