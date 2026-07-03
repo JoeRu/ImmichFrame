@@ -104,6 +104,8 @@ General:
   PlayAudio: false  # boolean
   # Allow two portrait images to be displayed next to each other
   Layout: 'splitview'  # single | splitview
+  # Group assets into chronological sets of this size; 0 disables the feature.
+  ChronologicalImagesCount: 0  # int
 
 # multiple accounts permitted
 Accounts:

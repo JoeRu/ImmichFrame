@@ -65,6 +65,7 @@
         public bool ImageFill { get; }
         public bool PlayAudio { get; }
         public string Layout { get; }
+        public int ChronologicalImagesCount { get; }
         public string Language { get; }
 
         public void Validate();

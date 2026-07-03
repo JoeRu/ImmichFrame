@@ -34,6 +34,7 @@ General:
   ImageFill: false
   PlayAudio: false
   Layout: splitview
+  ChronologicalImagesCount: 0
 Accounts:
   - ImmichServerUrl: REQUIRED
     # Exactly one of ApiKey or ApiKeyFile must be set.
