@@ -15,23 +15,26 @@ public class MultiImmichFrameLogicDelegateTests
         var generalSettings = new Mock<IGeneralSettings>();
         generalSettings.SetupGet(x => x.ChronologicalImagesCount).Returns(3);
 
+        var accountSettings = CreateAccountSettings("https://example.com");
+        var accountLogic = CreateAccountLogic(accountSettings);
+
         var serverSettings = new Mock<IServerSettings>();
         serverSettings.SetupGet(x => x.GeneralSettings).Returns(generalSettings.Object);
-        serverSettings.SetupGet(x => x.Accounts).Returns(new[] { CreateAccountSettings("https://example.com") });
+        serverSettings.SetupGet(x => x.Accounts).Returns(new[] { accountSettings });
 
         var selectionStrategy = new Mock<IAccountSelectionStrategy>();
         selectionStrategy
             .Setup(x => x.GetAssets())
             .ReturnsAsync(new List<(IAccountImmichFrameLogic, AssetResponseDto)>
             {
-                (CreateAccountLogic("https://example.com"), CreateAsset("a")),
-                (CreateAccountLogic("https://example.com"), CreateAsset("b")),
-                (CreateAccountLogic("https://example.com"), CreateAsset("c"))
+                (accountLogic, CreateAsset("a")),
+                (accountLogic, CreateAsset("b")),
+                (accountLogic, CreateAsset("c"))
             });
 
         var sut = new MultiImmichFrameLogicDelegate(
             serverSettings.Object,
-            _ => throw new NotSupportedException(),
+            _ => accountLogic,
             Mock.Of<Microsoft.Extensions.Logging.ILogger<MultiImmichFrameLogicDelegate>>(),
             selectionStrategy.Object);
 
@@ -53,10 +56,10 @@ public class MultiImmichFrameLogicDelegateTests
         return account.Object;
     }
 
-    private static IAccountImmichFrameLogic CreateAccountLogic(string url)
+    private static IAccountImmichFrameLogic CreateAccountLogic(IAccountSettings accountSettings)
     {
         var logic = new Mock<IAccountImmichFrameLogic>();
-        logic.SetupGet(x => x.AccountSettings).Returns(CreateAccountSettings(url));
+        logic.SetupGet(x => x.AccountSettings).Returns(accountSettings);
         return logic.Object;
     }
 
