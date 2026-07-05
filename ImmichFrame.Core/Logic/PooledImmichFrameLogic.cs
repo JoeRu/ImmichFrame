@@ -3,6 +3,7 @@ using ImmichFrame.Core.Exceptions;
 using ImmichFrame.Core.Helpers;
 using ImmichFrame.Core.Interfaces;
 using ImmichFrame.Core.Logic.Pool;
+using ImmichFrame.Core.Models;
 
 namespace ImmichFrame.Core.Logic;
 
@@ -35,17 +36,12 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
 
     private IAssetPool BuildPool(IAccountSettings accountSettings)
     {
+        var hasAlbums = accountSettings.Albums?.Any() ?? false;
+        var hasPeople = accountSettings.People?.Any() ?? false;
+        var hasTags = accountSettings.Tags?.Any() ?? false;
         IAssetPool basePool;
 
-                // Prefer actual chronological pool if enabled 
-        if (_generalSettings.ChronologicalImagesCount > 0)
-        {
-            var randomDatePool = new RandomDateAssetsPool(_apiCache, _immichApi, AccountSettings);
-            randomDatePool.ConfigureAssetsPerRandomDate(_generalSettings.ChronologicalImagesCount);
-            return new ChronologicalAssetsPoolWrapper(randomDatePool, _generalSettings);
-        }
-        
-        if (!accountSettings.ShowFavorites && !accountSettings.ShowMemories && !accountSettings.Albums.Any() && !accountSettings.People.Any())
+        if (!accountSettings.ShowFavorites && !accountSettings.ShowMemories && !hasAlbums && !hasPeople && !hasTags)
         {
             basePool = new AllAssetsPool(_apiCache, _immichApi, accountSettings);
         }
@@ -59,16 +55,21 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
             if (accountSettings.ShowMemories)
                 pools.Add(new MemoryAssetsPool(_immichApi, accountSettings));
 
-            if (accountSettings.Albums.Any())
+            if (hasAlbums)
                 pools.Add(new AlbumAssetsPool(_apiCache, _immichApi, accountSettings));
 
-            if (accountSettings.People.Any())
+            if (hasPeople)
                 pools.Add(new PersonAssetsPool(_apiCache, _immichApi, accountSettings));
+
+            if (hasTags)
+                pools.Add(new TagAssetsPool(_apiCache, _immichApi, accountSettings));
 
             basePool = new MultiAssetPool(pools);
         }
-        
-        return basePool;
+
+        return _generalSettings.ChronologicalImagesCount > 0
+            ? new ChronologicalAssetsPoolWrapper(basePool, _generalSettings)
+            : basePool;
     }
 
     public async Task<AssetResponseDto?> GetNextAsset()
@@ -76,24 +77,54 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
         return (await _pool.GetAssets(1)).FirstOrDefault();
     }
 
-    public Task<IEnumerable<AssetResponseDto>> GetAssets()
+    public async Task<IEnumerable<AssetResponseDto>> GetAssets()
     {
-        return _pool.GetAssets(25);
+        return await _pool.GetAssets(25);
     }
 
-    public Task<AssetResponseDto> GetAssetInfoById(Guid assetId) => _immichApi.GetAssetInfoAsync(assetId, null);
+    public async Task<AssetResponseDto> GetAssetInfoById(Guid assetId) => await _immichApi.GetAssetInfoAsync(assetId, null, null);
 
-    public async Task<IEnumerable<AlbumResponseDto>> GetAlbumInfoById(Guid assetId) => await _immichApi.GetAllAlbumsAsync(assetId, null);
+    public async Task<IEnumerable<AssetFaceResponseDto>> GetAssetFacesById(Guid assetId) => await _immichApi.GetFacesAsync(assetId);
 
-    public Task<long> GetTotalAssets() => _pool.GetAssetCount();
+    public async Task<IEnumerable<AlbumResponseDto>> GetAlbumInfoById(Guid assetId) => await _immichApi.GetAllAlbumsAsync(assetId, null, null, null, null);
 
-    public async Task<(string fileName, string ContentType, Stream fileStream)> GetImage(Guid id)
+    public async Task<long> GetTotalAssets() => await _pool.GetAssetCount();
+
+    public async Task<AssetResponse> GetAsset(Guid id, AssetTypeEnum? assetType = null, string? rangeHeader = null)
     {
-        // First, get asset info to determine if it's a video or image
-        var assetInfo = await _immichApi.GetAssetInfoAsync(id, null);
-        
-        // Check if the asset is already downloaded (for images only, skip download for videos)
-        if (_generalSettings.DownloadImages && assetInfo.Type == AssetTypeEnum.IMAGE)
+        if (!assetType.HasValue)
+        {
+            var assetInfo = await _immichApi.GetAssetInfoAsync(id, null, null);
+            if (assetInfo == null)
+                throw new AssetNotFoundException($"Assetinfo for asset '{id}' was not found!");
+            assetType = assetInfo.Type;
+        }
+
+        if (assetType == AssetTypeEnum.IMAGE)
+        {
+            var (fileName, contentType, fileStream) = await GetImageAsset(id);
+            return new AssetResponse
+            {
+                FileName = fileName,
+                ContentType = contentType,
+                FileStream = fileStream,
+                ContentRange = null,
+                IsPartial = false,
+                Owner = null,
+                ContentLength = null
+            };
+        }
+
+        if (assetType == AssetTypeEnum.VIDEO)
+        {
+            return await GetVideoAsset(id, rangeHeader);
+        }
+
+        throw new AssetNotFoundException($"Asset {id} is not a supported media type ({assetType}).");
+    }
+    private async Task<(string fileName, string ContentType, Stream fileStream)> GetImageAsset(Guid id)
+    {
+        if (_generalSettings.DownloadImages)
         {
             if (!Directory.Exists(_downloadLocation))
             {
@@ -109,7 +140,7 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
                 {
                     var fs = File.OpenRead(file);
 
-                    var ex = Path.GetExtension(file);
+                    var ex = Path.GetExtension(file).TrimStart('.');
 
                     return (Path.GetFileName(file), $"image/{ex}", fs);
                 }
@@ -118,18 +149,7 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
             }
         }
 
-        // Use appropriate API endpoint based on asset type
-        FileResponse data;
-        if (assetInfo.Type == AssetTypeEnum.VIDEO)
-        {
-            // Use video playback endpoint for videos
-            data = await _immichApi.PlayAssetVideoAsync(id, string.Empty);
-        }
-        else
-        {
-            // Use view asset endpoint for images (thumbnail/preview)
-            data = await _immichApi.ViewAssetAsync(id, string.Empty, AssetMediaSize.Preview);
-        }
+        var data = await _immichApi.ViewAssetAsync(null, id, string.Empty, AssetMediaSize.Preview, null);
 
         if (data == null)
             throw new AssetNotFoundException($"Asset {id} was not found!");
@@ -140,31 +160,10 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
             contentType = data.Headers["Content-Type"].FirstOrDefault() ?? "";
         }
 
-        // Determine file extension based on asset type and content type
-        string ext;
-        if (assetInfo.Type == AssetTypeEnum.VIDEO)
-        {
-            // For videos, try to determine extension from content type or default to mp4
-            ext = contentType.ToLower() switch
-            {
-                var ct when ct.Contains("mp4") => "mp4",
-                var ct when ct.Contains("webm") => "webm",
-                var ct when ct.Contains("ogg") => "ogg",
-                var ct when ct.Contains("avi") => "avi",
-                var ct when ct.Contains("mov") => "mov",
-                _ => "mp4" // Default to mp4 for videos
-            };
-        }
-        else
-        {
-            // For images, use existing logic
-            ext = contentType.ToLower() == "image/webp" ? "webp" : "jpeg";
-        }
-        
+        var ext = contentType.ToLower() == "image/webp" ? "webp" : "jpeg";
         var fileName = $"{id}.{ext}";
 
-        // Only save images to folder, not videos (videos are typically large)
-        if (_generalSettings.DownloadImages && assetInfo.Type == AssetTypeEnum.IMAGE)
+        if (_generalSettings.DownloadImages)
         {
             var stream = data.Stream;
 
@@ -180,8 +179,36 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
         return (fileName, contentType, data.Stream);
     }
 
-    public Task SendWebhookNotification(IWebhookNotification notification) =>
-        WebhookHelper.SendWebhookNotification(notification, _generalSettings.Webhook);
+    private async Task<AssetResponse> GetVideoAsset(Guid id, string? rangeHeader = null)
+    {
+        var videoResponse = string.IsNullOrEmpty(rangeHeader)
+            ? await _immichApi.PlayAssetVideoAsync(id, null, null)
+            : await _immichApi.PlayAssetVideoWithRangeAsync(id, rangeHeader);
+
+        var contentType = videoResponse.Headers.TryGetValue("Content-Type", out var ct)
+            ? ct.FirstOrDefault() ?? "video/mp4"
+            : "video/mp4";
+
+        var contentRange = videoResponse.Headers.TryGetValue("Content-Range", out var cr)
+            ? cr.FirstOrDefault()
+            : null;
+
+        long? contentLength = videoResponse.Headers.TryGetValue("Content-Length", out var cl)
+            && long.TryParse(cl.FirstOrDefault(), out var clValue) ? clValue : null;
+
+        return new AssetResponse
+        {
+            FileName = $"{id}.mp4",
+            ContentType = contentType,
+            FileStream = videoResponse.Stream,
+            ContentRange = contentRange,
+            IsPartial = videoResponse.StatusCode == 206,
+            Owner = videoResponse,
+            ContentLength = contentLength
+        };
+    }
+    public async Task SendWebhookNotification(IWebhookNotification notification) =>
+        await WebhookHelper.SendWebhookNotification(notification, _generalSettings.Webhook);
 
     public override string ToString() => $"Account Pool [{_immichApi.BaseUrl}]";
 }

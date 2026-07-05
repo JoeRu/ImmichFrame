@@ -22,6 +22,7 @@ public class ServerSettingsV1 : IConfigSettable
     public List<Guid> Albums { get; set; } = new List<Guid>();
     public List<Guid> ExcludedAlbums { get; set; } = new List<Guid>();
     public List<Guid> People { get; set; } = new List<Guid>();
+    public List<string> Tags { get; set; } = new List<string>();
     public int? Rating { get; set; }
     public List<string> Webcalendars { get; set; } = new List<string>();
     public int RefreshAlbumPeopleInterval { get; set; } = 12;
@@ -41,6 +42,7 @@ public class ServerSettingsV1 : IConfigSettable
     public string? PhotoDateFormat { get; set; } = "MM/dd/yyyy";
     public bool ShowImageDesc { get; set; } = true;
     public bool ShowPeopleDesc { get; set; } = true;
+    public bool ShowTagsDesc { get; set; } = true;
     public bool ShowAlbumName { get; set; } = true;
     public bool ShowImageLocation { get; set; } = true;
     public string? ImageLocationFormat { get; set; } = "City,State,Country";
@@ -53,6 +55,7 @@ public class ServerSettingsV1 : IConfigSettable
     public bool ImageZoom { get; set; } = true;
     public bool ImagePan { get; set; } = false;
     public bool ImageFill { get; set; } = false;
+    public bool PlayAudio { get; set; } = false;
     public string Layout { get; set; } = "splitview";
     public int ChronologicalImagesCount { get; set; } = 3;
 }
@@ -66,23 +69,36 @@ public class ServerSettingsV1Adapter(ServerSettingsV1 _delegate) : IServerSettin
     public IEnumerable<IAccountSettings> Accounts => new List<AccountSettingsV1Adapter> { new(_delegate) };
     public IGeneralSettings GeneralSettings => new GeneralSettingsV1Adapter(_delegate);
 
+    public void Validate()
+    {
+        GeneralSettings.Validate();
+        foreach (var account in Accounts)
+        {
+            account.ValidateAndInitialize();
+        }
+    }
 
     class AccountSettingsV1Adapter(ServerSettingsV1 _delegate) : IAccountSettings
     {
         public string ImmichServerUrl => _delegate.ImmichServerUrl;
         public string ApiKey => _delegate.ApiKey;
+        public string? ApiKeyFile => null;  // V1 settings didn't support paths to api keys.
         public bool ShowMemories => _delegate.ShowMemories;
         public bool ShowFavorites => _delegate.ShowFavorites;
         public bool ShowArchived => _delegate.ShowArchived;
         public bool ShowVideos => _delegate.ShowVideos;
         public bool ShowVideosOnly => _delegate.ShowVideosOnly;
+        public bool PlayAudio => _delegate.PlayAudio;
         public int? ImagesFromDays => _delegate.ImagesFromDays;
         public DateTime? ImagesFromDate => _delegate.ImagesFromDate;
         public DateTime? ImagesUntilDate => _delegate.ImagesUntilDate;
         public List<Guid> Albums => _delegate.Albums;
         public List<Guid> ExcludedAlbums => _delegate.ExcludedAlbums;
         public List<Guid> People => _delegate.People;
+        public List<string> Tags => _delegate.Tags;
         public int? Rating => _delegate.Rating;
+
+        public void ValidateAndInitialize() { }
     }
 
     class GeneralSettingsV1Adapter(ServerSettingsV1 _delegate) : IGeneralSettings
@@ -106,6 +122,7 @@ public class ServerSettingsV1Adapter(ServerSettingsV1 _delegate) : IServerSettin
         public string? PhotoDateFormat => _delegate.PhotoDateFormat;
         public bool ShowImageDesc => _delegate.ShowImageDesc;
         public bool ShowPeopleDesc => _delegate.ShowPeopleDesc;
+        public bool ShowTagsDesc => _delegate.ShowTagsDesc;
         public bool ShowAlbumName => _delegate.ShowAlbumName;
         public bool ShowImageLocation => _delegate.ShowImageLocation;
         public string? ImageLocationFormat => _delegate.ImageLocationFormat;
@@ -118,8 +135,11 @@ public class ServerSettingsV1Adapter(ServerSettingsV1 _delegate) : IServerSettin
         public bool ImageZoom => _delegate.ImageZoom;
         public bool ImagePan => _delegate.ImagePan;
         public bool ImageFill => _delegate.ImageFill;
+        public bool PlayAudio => _delegate.PlayAudio;
         public string Layout => _delegate.Layout;
-        public string Language => _delegate.Language;
         public int ChronologicalImagesCount => _delegate.ChronologicalImagesCount;
+        public string Language => _delegate.Language;
+
+        public void Validate() { }
     }
 }

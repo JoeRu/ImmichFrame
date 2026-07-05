@@ -30,25 +30,27 @@
     "Style": "none",
     "BaseFontSize": "17px",
     "ShowWeatherDescription": true,
-    "WeatherIconUrl" : "https://openweathermap.org/img/wn/{IconId}.png",
+    "WeatherIconUrl": "https://openweathermap.org/img/wn/{IconId}.png",
     "ImageZoom": true,
     "ImagePan": false,
     "ImageFill": false,
+    "PlayAudio": false,
     "Layout": "splitview",
     "ChronologicalImagesCount": 0
   },
   "Accounts": [
     {
       "ImmichServerUrl": "REQUIRED",
-      "ApiKey": "REQUIRED",
+      "ApiKey": "super-secret-api-key",
+      "ApiKeyFile": "/path/to/api.key",
       "ImagesFromDate": null,
       "ShowMemories": false,
       "ShowFavorites": false,
       "ShowArchived": false,
+      "ShowVideos": false,
+      "ShowVideosOnly": false,
       "ImagesFromDays": null,
       "ImagesUntilDate": "2020-01-02",
-      "ShowVideos": true,
-      "ShowVideosOnly": false,
       "Rating": null,
       "Albums": [
         "UUID"
@@ -58,6 +60,10 @@
       ],
       "People": [
         "UUID"
+      ],
+      "Tags": [
+        "Vacation",
+        "Travel/Europe"
       ]
     }
   ]

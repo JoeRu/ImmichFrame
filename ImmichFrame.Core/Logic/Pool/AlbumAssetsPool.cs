@@ -1,5 +1,4 @@
 using ImmichFrame.Core.Api;
-using ImmichFrame.Core.Helpers;
 using ImmichFrame.Core.Interfaces;
 
 namespace ImmichFrame.Core.Logic.Pool;
@@ -8,22 +7,36 @@ public class AlbumAssetsPool(IApiCache apiCache, ImmichApi immichApi, IAccountSe
 {
     protected override async Task<IEnumerable<AssetResponseDto>> LoadAssets(CancellationToken ct = default)
     {
-        var excludedAlbumAssets = new List<AssetResponseDto>();
-
-        foreach (var albumId in accountSettings.ExcludedAlbums)
-        {
-            var albumInfo = await immichApi.GetAlbumInfoAsync(albumId, null, null, ct);
-            excludedAlbumAssets.AddRange(albumInfo.Assets);
-        }
-
         var albumAssets = new List<AssetResponseDto>();
 
-        foreach (var albumId in accountSettings.Albums)
+        var albums = accountSettings.Albums;
+        if (albums != null)
         {
-            var albumInfo = await immichApi.GetAlbumInfoAsync(albumId, null, null, ct);
-            albumAssets.AddRange(albumInfo.Assets);
+            foreach (var albumId in albums)
+            {
+                int page = 1;
+                int batchSize = 1000;
+                int itemsInPage;
+                do
+                {
+                    var metadataBody = new MetadataSearchDto
+                    {
+                        Page = page,
+                        Size = batchSize,
+                        AlbumIds = [albumId],
+                        WithExif = true,
+                        WithPeople = true,
+                    };
+                    var searchResponse = await immichApi.SearchAssetsAsync(metadataBody, ct);
+
+                    itemsInPage = searchResponse.Assets.Items.Count;
+
+                    albumAssets.AddRange(searchResponse.Assets.Items);
+                    page++;
+                } while (itemsInPage == batchSize);
+            }
         }
 
-        return albumAssets.WhereExcludes(excludedAlbumAssets, t => t.Id);
+        return albumAssets;
     }
 }

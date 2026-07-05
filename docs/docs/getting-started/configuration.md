@@ -27,7 +27,7 @@ Only override settings you intend to change.
 Defaults might change between versions, so keeping your config minimal helps future upgrades.
 :::
 
-Defaults are below, only one account with `ImmichServerUrl` and `ApiKey` are required.
+Defaults are below, only one account with `ImmichServerUrl` and `ApiKey`|`ApiKeyFile` are required.
 
 ```yaml
 # settings applicable to the web client - when viewing with a browser or webview
@@ -38,10 +38,12 @@ General:
   DownloadImages: false  # boolean
   # if images are downloaded, re-download if age (in days) is more than this
   RenewImagesDuration: 30  # int
-  # A list of webcalendar URIs in the .ics format. e.g. https://calendar.google.com/calendar/ical/XXXXXX/public/basic.ics
+  # A list of webcalendar URIs in the .ics format. Supports basic auth via standard URL format.
+  # e.g. https://calendar.google.com/calendar/ical/XXXXXX/public/basic.ics
+  # e.g. https://user:pass@calendar.immichframe.dev/dav/calendars/basic.ics
   Webcalendars:  # string[]
     - UUID
-  # Interval in hours. Determines how often images are pulled from a person in immich.
+  # Interval in hours. Determines how often images are pulled from a album/person in immich.
   RefreshAlbumPeopleInterval: 12  # int
   # Date format. See https://date-fns.org/v4.1.0/docs/format for more information.
   PhotoDateFormat: 'MM/dd/yyyy'  # string
@@ -74,6 +76,8 @@ General:
   ShowImageDesc: true  # boolean
   # Displays a comma separated list of names of all the people that are assigned in immich.
   ShowPeopleDesc: true  # boolean
+  # Displays a comma separated list of names of all the tags that are assigned in immich.
+  ShowTagsDesc: true  # boolean
   # Displays a comma separated list of names of all the albums for an image.
   ShowAlbumName: true  # boolean
   # Displays the location of the current image.
@@ -96,15 +100,21 @@ General:
   ImagePan: false  # boolean
   # Whether image should fill available space. Aspect ratio maintained but may be cropped.
   ImageFill: false  # boolean
+  # Whether to play audio for videos that have audio tracks.
+  PlayAudio: false  # boolean
   # Allow two portrait images to be displayed next to each other
   Layout: 'splitview'  # single | splitview
+  # Group assets into chronological sets of this size; 0 disables the feature.
+  ChronologicalImagesCount: 0  # int
 
 # multiple accounts permitted
 Accounts:
   - # The URL of your Immich server e.g. `http://photos.yourdomain.com` / `http://192.168.0.100:2283`.
     ImmichServerUrl: 'REQUIRED'  # string, required, no default
     # Read more about how to obtain an Immich API key: https://immich.app/docs/features/command-line-interface#obtain-the-api-key
-    ApiKey: 'REQUIRED'  # string, required, no default
+    # Exactly one of ApiKey or ApiKeyFile must be set.
+    ApiKey: "super-secret-api-key"
+    # ApiKeyFile: "/path/to/api.key"
     # Show images after date. Overwrites the `ImagesFromDays`-Setting
     ImagesFromDate: null  # Date
     # If this is set, memories are displayed.
@@ -113,6 +123,8 @@ Accounts:
     ShowFavorites: false  # boolean
     # If this is set, assets marked archived are displayed.
     ShowArchived: false  # boolean
+    # If this is set, video assets are included in the slideshow.
+    ShowVideos: false  # boolean
     # Show images from the last X days, e.g., 365 -> show images from the last year
     ImagesFromDays: null  # int
     # Show images before date.
@@ -128,6 +140,10 @@ Accounts:
     # UUID of People
     People:  # string[]
       - UUID
+    # Tag values (full hierarchical paths, case-sensitive)
+    Tags:  # string[]
+      - "Vacation"
+      - "Travel/Europe"
 
   ```
 ### Security
@@ -138,11 +154,23 @@ If this is enabled, the web api required the `Authorization`-Header with `Bearer
 ### Filtering on Albums or People
 You can get the UUIDs from the URL of the album/person. For this URL: `https://demo.immich.app/albums/85c85b29-c95d-4a8b-90f7-c87da1d518ba` this is the UUID: `85c85b29-c95d-4a8b-90f7-c87da1d518ba`
 
+### Filtering on Tags
+For tags, use the full hierarchical path (the `value` field) as it appears in Immich. Tags in Immich support hierarchical structures using forward slashes (e.g., `Parent/Child`). Matching is case-sensitive, and the full path will be automatically resolved to the tag ID.
+
+**Examples:**
+- `"Vacation"` - matches a top-level tag named "Vacation"
+- `"Travel/Europe"` - matches a tag "Europe" under parent "Travel"
+
 ### Weather
 Weather is enabled by entering an API key. Get yours free from [OpenWeatherMap][openweathermap-url]
 
 ### Calendar
 If you are using Google Calendar, more information can be found [here](https://support.google.com/calendar/answer/37648?hl=en#zippy=%2Cget-your-calendar-view-only).
+
+Calendar supports basic authentication using the standard URL userinfo format:
+Example:
+No Auth: `https://calendar.google.com/calendar/ical/XXXXXX/public/basic.ics`
+With Auth: `https://username:password@calendar.immichframe.dev/dav/calendars/basic.ics`
 
 ### Misc
 #### Webhook
@@ -155,7 +183,7 @@ Events will always contain a `Name`, `ClientIdentifier` and a `DateTime` to diff
 
 | **Event**                  | **Description**                      | **Payload**                                                                                                                                             |
 | -------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ImageRequestedNotification | Notifies when an image is requested. | `{"Name":"ImageRequestedNotification", "ClientIdentifier": "Frame_Kitchen", "DateTime":"2024-11-16T21:37:19.4933981+01:00", "RequestedImageId":"UUID"}` |
+| AssetRequestedNotification | Notifies when an asset is requested. | `{"Name":"AssetRequestedNotification", "ClientIdentifier": "Frame_Kitchen", "DateTime":"2024-11-16T21:37:19.4933981+01:00", "RequestedAssetId":"UUID"}` |
 
 ### Multiple Immich Accounts
 ImmichFrame can be configured to access multiple Immich accounts, on the same or different servers.
@@ -174,6 +202,7 @@ For full ImmichFrame functionality, the API key being used needs the following p
 - `memory.read`
 - `person.read`
 - `person.statistics`
+- `tag.read`
 
 
 ### Custom CSS
@@ -189,3 +218,6 @@ ImmichFrame can be customized even further using CSS. This will apply to browser
 volumes:  
       - /PATH/TO/YOUR/custom.css:/app/wwwroot/static/custom.css
 ```
+
+
+[openweathermap-url]: https://openweathermap.org/appid

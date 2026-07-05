@@ -34,17 +34,21 @@
     "ImageZoom": true,
     "ImagePan": true,
     "ImageFill": true,
-    "Layout": "Layout_TEST",
-    "ChronologicalImagesCount": 7
+    "PlayAudio": true,
+    "ChronologicalImagesCount": 7,
+    "Layout": "Layout_TEST"
   },
   "Accounts": [
     {
       "ImmichServerUrl": "Account1.ImmichServerUrl_TEST",
       "ApiKey": "Account1.ApiKey_TEST",
+      "ApiKeyFile": "Account1.ApiKeyFile_TEST",
       "ImagesFromDate": "2020-01-02",
       "ShowMemories": true,
       "ShowFavorites": true,
       "ShowArchived": true,
+      "ShowVideos": true,
+      "ShowVideosOnly": true,
       "ImagesFromDays": 7,
       "ImagesUntilDate": "2020-01-02",
       "Rating": 7,
@@ -57,16 +61,20 @@
       "People": [
         "00000000-0000-0000-0000-000000000001"
       ],
-      "ShowVideos": true,
-      "ShowVideosOnly": false
+      "Tags": [
+        "Account1.Tags_TEST"
+      ]
     },
     {
       "ImmichServerUrl": "Account2.ImmichServerUrl_TEST",
       "ApiKey": "Account2.ApiKey_TEST",
+      "ApiKeyFile": "Account2.ApiKeyFile_TEST",
       "ImagesFromDate": "2020-01-02",
       "ShowMemories": true,
       "ShowFavorites": true,
       "ShowArchived": true,
+      "ShowVideos": true,
+      "ShowVideosOnly": true,
       "ImagesFromDays": 7,
       "ImagesUntilDate": "2020-01-02",
       "Rating": 7,
@@ -79,8 +87,9 @@
       "People": [
         "00000000-0000-0000-0000-000000000001"
       ],
-      "ShowVideos": true,
-      "ShowVideosOnly": true
+      "Tags": [
+        "Account2.Tags_TEST"
+      ]
     }
   ]
 }

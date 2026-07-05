@@ -17,14 +17,14 @@ public class TotalAccountImagesSelectionStrategy(ILogger<TotalAccountImagesSelec
     public async Task<(IAccountImmichFrameLogic, AssetResponseDto)?> GetNextAsset()
     {
         var chosen = await _accounts.ChooseOne(logic => logic.GetTotalAssets());
-        
+
         var asset = await chosen.GetNextAsset();
         if (asset != null)
         {
             await _tracker.RecordAssetLocation(chosen, asset.Id);
             return (chosen, asset);
         }
-        
+
         _logger.LogDebug("No next asset found");
         return null;
     }
@@ -60,11 +60,9 @@ public class TotalAccountImagesSelectionStrategy(ILogger<TotalAccountImagesSelec
                 var (task, account, proportion) = tuple;
                 var assets = (await task).ToList();
                 _logger.LogDebug("Retrieved {total} asset(s) for account [{account}], will take {proportion}%", assets.Count(), account, proportion * 100);
-                
-                // Skip shuffling if chronological sorting is enabled to preserve order
-                var processedAssets = _generalSettings.ChronologicalImagesCount > 0 
+                var processedAssets = _generalSettings.ChronologicalImagesCount > 0
                     ? assets.TakeProportional(proportion)
-                    : assets.Shuffle().TakeProportional(proportion); // Better would be to shuffle sets, in pool classes;
+                    : assets.Shuffle().TakeProportional(proportion);
                 return (account, processedAssets);
             });
 
@@ -88,5 +86,5 @@ public class TotalAccountImagesSelectionStrategy(ILogger<TotalAccountImagesSelec
     }
 
     public T ForAsset<T>(Guid assetId, Func<IAccountImmichFrameLogic, T> f)
-        => _tracker.ForAsset(assetId.ToString(), f);
+        => _tracker.ForAsset(assetId, f);
 }

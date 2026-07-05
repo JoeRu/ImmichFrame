@@ -3,6 +3,7 @@
 	import * as api from '$lib/index';
 	import ErrorElement from './error-element.svelte';
 	import Asset from './asset.svelte';
+	import type AssetComponent from './asset.svelte';
 	import LoadingElement from './LoadingElement.svelte';
 	import { fade } from 'svelte/transition';
 	import { configStore } from '$lib/stores/config.store';
@@ -12,7 +13,7 @@
 	api.init();
 
 	interface Props {
-		images: [string, AssetResponseDto, api.AlbumResponseDto[]][];
+		assets: [string, AssetResponseDto, api.AssetFaceResponseDto[], api.AlbumResponseDto[]][];
 		interval?: number;
 		error?: boolean;
 		loaded?: boolean;
@@ -22,17 +23,20 @@
 		showPhotoDate?: boolean;
 		showImageDesc?: boolean;
 		showPeopleDesc?: boolean;
+		showTagsDesc?: boolean;
 		showAlbumName?: boolean;
 		imageFill?: boolean;
 		imageZoom?: boolean;
 		imagePan?: boolean;
 		showInfo: boolean;
-		onVideoEnd?: () => void;
-		onColorExtracted?: (videoElement: HTMLVideoElement) => void;
+		playAudio?: boolean;
+		onVideoWaiting?: () => void;
+		onVideoPlaying?: () => void;
+		onAssetError?: () => void;
 	}
 
 	let {
-		images,
+		assets,
 		interval = 20,
 		error = false,
 		loaded = false,
@@ -42,19 +46,35 @@
 		showPhotoDate = true,
 		showImageDesc = true,
 		showPeopleDesc = true,
+		showTagsDesc = true,
 		showAlbumName = true,
 		imageFill = false,
 		imageZoom = false,
 		imagePan = false,
 		showInfo = $bindable(false),
-		onVideoEnd,
-		onColorExtracted
+		playAudio = false,
+		onVideoWaiting = () => {},
+		onVideoPlaying = () => {},
+		onAssetError = () => {}
 	}: Props = $props();
 	let instantTransition = slideshowStore.instantTransition;
 	let transitionDuration = $derived(
 		$instantTransition ? 0 : ($configStore.transitionDuration ?? 1) * 1000
 	);
 	let transitionDelay = $derived($instantTransition ? 0 : transitionDuration / 2 + 25);
+
+	let primaryAssetComponent = $state<AssetComponent | undefined>(undefined);
+	let secondaryAssetComponent = $state<AssetComponent | undefined>(undefined);
+
+	export const pause = async () => {
+		await primaryAssetComponent?.pause?.();
+		await secondaryAssetComponent?.pause?.();
+	};
+
+	export const play = async () => {
+		await primaryAssetComponent?.play?.();
+		await secondaryAssetComponent?.play?.();
+	};
 </script>
 
 {#if hasBday}
@@ -76,7 +96,7 @@
 {#if error}
 	<ErrorElement />
 {:else if loaded}
-	{#key images}
+	{#key assets}
 		<div
 			class="grid absolute h-dvh-safe w-screen"
 			out:fade={{ duration: transitionDuration / 2 }}
@@ -86,57 +106,70 @@
 				<div class="grid grid-cols-2">
 					<div id="image_portrait_1" class="relative grid border-r-2 border-primary h-dvh-safe">
 						<Asset
-							multi={true}
-							asset={images[0]}
+							asset={assets[0]}
 							{interval}
 							{showLocation}
 							{showPhotoDate}
 							{showImageDesc}
 							{showPeopleDesc}
+							{showTagsDesc}
 							{showAlbumName}
 							{imageFill}
 							{imageZoom}
 							{imagePan}
+							{split}
+							{playAudio}
+							{onVideoWaiting}
+							{onVideoPlaying}
+							{onAssetError}
+							bind:this={primaryAssetComponent}
 							bind:showInfo
-							{onVideoEnd}
-							{onColorExtracted}
 						/>
 					</div>
 					<div id="image_portrait_2" class="relative grid border-l-2 border-primary h-dvh-safe">
-						<Image
-							multi={true}
-							image={images[1]}
+						<Asset
+							asset={assets[1]}
 							{interval}
 							{showLocation}
 							{showPhotoDate}
 							{showImageDesc}
 							{showPeopleDesc}
+							{showTagsDesc}
 							{showAlbumName}
 							{imageFill}
 							{imageZoom}
 							{imagePan}
+							{split}
+							{playAudio}
+							{onVideoWaiting}
+							{onVideoPlaying}
+							{onAssetError}
+							bind:this={secondaryAssetComponent}
 							bind:showInfo
-							{onVideoEnd}
-							{onColorExtracted}
 						/>
 					</div>
 				</div>
 			{:else}
 				<div id="image_default" class="relative grid h-dvh-safe w-screen">
 					<Asset
-						asset={images[0]}
+						asset={assets[0]}
 						{interval}
 						{showLocation}
 						{showPhotoDate}
 						{showImageDesc}
 						{showPeopleDesc}
+						{showTagsDesc}
 						{showAlbumName}
 						{imageFill}
 						{imageZoom}
 						{imagePan}
+						{split}
+						{playAudio}
+						{onVideoWaiting}
+						{onVideoPlaying}
+						{onAssetError}
+						bind:this={primaryAssetComponent}
 						bind:showInfo
-						{onVideoEnd}
-						{onColorExtracted}
 					/>
 				</div>
 			{/if}

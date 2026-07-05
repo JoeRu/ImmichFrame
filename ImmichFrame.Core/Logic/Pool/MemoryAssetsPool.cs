@@ -9,19 +9,25 @@ public class MemoryAssetsPool(ImmichApi immichApi, IAccountSettings accountSetti
 {
     protected override async Task<IEnumerable<AssetResponseDto>> LoadAssets(CancellationToken ct = default)
     {
-        var memories = await immichApi.SearchMemoriesAsync(DateTime.Today.ToUniversalTime(), null, null, null, ct);
+        var searchDate = DateTimeOffset.Now;
+        var memories = await immichApi.SearchMemoriesAsync(searchDate, null, null, null, null, null, ct);
 
         var memoryAssets = new List<AssetResponseDto>();
         foreach (var memory in memories)
         {
             var assets = memory.Assets.ToList();
-            var yearsAgo = DateTime.Now.Year - memory.Data.Year;
+            var yearsAgo = searchDate.Year - memory.Data.Year;
+
+            if (!accountSettings.ShowVideos)
+            {
+                assets = assets.Where(a => a.Type == AssetTypeEnum.IMAGE).ToList();
+            }
 
             foreach (var asset in assets)
             {
                 if (asset.ExifInfo == null)
                 {
-                    var assetInfo = await immichApi.GetAssetInfoAsync(new Guid(asset.Id), null, ct);
+                    var assetInfo = await immichApi.GetAssetInfoAsync(asset.Id, null, null, ct);
                     asset.ExifInfo = assetInfo.ExifInfo;
                     asset.People = assetInfo.People;
                 }
@@ -39,9 +45,9 @@ public class MemoryAssetsPool(ImmichApi immichApi, IAccountSettings accountSetti
 class DailyApiCache : ApiCache
 {
     public DailyApiCache() : base(() => new MemoryCacheEntryOptions
-        {
-            AbsoluteExpiration = DateTimeOffset.Now.Date.AddDays(1)
-        }
+    {
+        AbsoluteExpiration = DateTimeOffset.Now.Date.AddDays(1)
+    }
     )
     {
     }

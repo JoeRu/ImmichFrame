@@ -32,15 +32,20 @@ General:
   ImageZoom: true
   ImagePan: false
   ImageFill: false
+  PlayAudio: false
   Layout: splitview
   ChronologicalImagesCount: 0
 Accounts:
   - ImmichServerUrl: REQUIRED
-    ApiKey: REQUIRED
+    # Exactly one of ApiKey or ApiKeyFile must be set.
+    ApiKey: "super-secret-api-key"
+    # ApiKeyFile: "/path/to/api.key"
+
     ImagesFromDate: null
     ShowMemories: false
     ShowFavorites: false
     ShowArchived: false
+    ShowVideos: false
     ImagesFromDays: null
     ImagesUntilDate: '2020-01-02'
     ShowVideos: true
@@ -52,3 +57,6 @@ Accounts:
       - UUID
     People:
       - UUID
+    Tags:
+      - Vacation
+      - Travel/Europe

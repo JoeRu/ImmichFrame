@@ -7,11 +7,15 @@
     "ImageZoom": true,
     "ImagePan": true,
     "ImageFill": true,
+    "PlayAudio": true,
+    "ChronologicalImagesCount": 7,
     "Layout": "Layout_TEST",
     "DownloadImages": true,
     "ShowMemories": true,
     "ShowFavorites": true,
     "ShowArchived": true,
+    "ShowVideos": true,
+    "ShowVideosOnly": true,
     "ImagesFromDays": 7,
     "ImagesFromDate": "2020-01-02",
     "ImagesUntilDate": "2020-01-02",
@@ -25,6 +29,9 @@
     ],
     "People": [
         "00000000-0000-0000-0000-000000000001"
+    ],
+    "Tags": [
+        "Tags_TEST"
     ],
     "Webcalendars": [
         "Webcalendars_TEST"
@@ -51,12 +58,7 @@
     "WeatherLatLong": "WeatherLatLong_TEST",
     "Language": "Language_TEST",
     "Webhook": "Webhook_TEST",
-    "ChronologicalImagesCount": 7,
-    "ShowVideos": true,
-    "ShowVideosOnly": true,
     "Account2.ImmichServerUrl": "Account2.ImmichServerUrl_TEST",
     "Account2.ApiKey": "Account2.ApiKey_TEST",
-    "Account2.ImagesFromDate": "Account2.ImagesFromDate_TEST",
-    "Account2.ShowVideos": true,
-    "Account2.ShowVideosOnly": false
+    "Account2.ImagesFromDate": "Account2.ImagesFromDate_TEST"
 }

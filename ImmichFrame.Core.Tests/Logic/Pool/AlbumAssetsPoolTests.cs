@@ -3,11 +3,6 @@ using Moq;
 using ImmichFrame.Core.Api;
 using ImmichFrame.Core.Interfaces;
 using ImmichFrame.Core.Logic.Pool;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Threading;
 
 namespace ImmichFrame.Core.Tests.Logic.Pool;
 
@@ -17,28 +12,28 @@ public class AlbumAssetsPoolTests
     private Mock<IApiCache> _mockApiCache;
     private Mock<ImmichApi> _mockImmichApi;
     private Mock<IAccountSettings> _mockAccountSettings;
-    private TestableAlbumAssetsPool _albumAssetsPool;
-
-    private class TestableAlbumAssetsPool(IApiCache apiCache, ImmichApi immichApi, IAccountSettings accountSettings)
-        : AlbumAssetsPool(apiCache, immichApi, accountSettings)
-    {
-        // Expose LoadAssets for testing
-        public Task<IEnumerable<AssetResponseDto>> TestLoadAssets(CancellationToken ct = default) => base.LoadAssets(ct);
-    }
+    private AlbumAssetsPool _albumAssetsPool;
 
     [SetUp]
     public void Setup()
     {
         _mockApiCache = new Mock<IApiCache>();
-        _mockImmichApi = new Mock<ImmichApi>("", null!);
+
+        _mockApiCache
+            .Setup(m => m.GetOrAddAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<IEnumerable<AssetResponseDto>>>>()))
+            .Returns<string, Func<Task<IEnumerable<AssetResponseDto>>>>((_, factory) => factory());
+
+        _mockImmichApi = new Mock<ImmichApi>("", null);
         _mockAccountSettings = new Mock<IAccountSettings>();
-        _albumAssetsPool = new TestableAlbumAssetsPool(_mockApiCache.Object, _mockImmichApi.Object, _mockAccountSettings.Object);
+        _albumAssetsPool = new AlbumAssetsPool(_mockApiCache.Object, _mockImmichApi.Object, _mockAccountSettings.Object);
 
         _mockAccountSettings.SetupGet(s => s.Albums).Returns(new List<Guid>());
         _mockAccountSettings.SetupGet(s => s.ExcludedAlbums).Returns(new List<Guid>());
     }
 
-    private AssetResponseDto CreateAsset(string id) => new AssetResponseDto { Id = id, Type = AssetTypeEnum.IMAGE };
+    private AssetResponseDto CreateAsset(string id) => new AssetResponseDto { Id = FixtureHelpers.GuidFor(id), Type = AssetTypeEnum.IMAGE };
 
     [Test]
     public async Task LoadAssets_ReturnsAssetsPresentIIncludedNotExcludedAlbums()
@@ -50,25 +45,25 @@ public class AlbumAssetsPoolTests
         var assetA = CreateAsset("A"); // In album1
         var assetB = CreateAsset("B"); // In album1 and excludedAlbum
         var assetC = CreateAsset("C"); // In excludedAlbum only
-        var assetD = CreateAsset("D"); // In album1 only (but not B)
+        var assetD = CreateAsset("D"); // In album1 only
 
         _mockAccountSettings.SetupGet(s => s.Albums).Returns(new List<Guid> { album1Id });
         _mockAccountSettings.SetupGet(s => s.ExcludedAlbums).Returns(new List<Guid> { excludedAlbumId });
 
-        _mockImmichApi.Setup(api => api.GetAlbumInfoAsync(album1Id, null, null, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AlbumResponseDto { Assets = new List<AssetResponseDto> { assetA, assetB, assetD } });
-        _mockImmichApi.Setup(api => api.GetAlbumInfoAsync(excludedAlbumId, null, null, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AlbumResponseDto { Assets = new List<AssetResponseDto> { assetB, assetC } });
+        _mockImmichApi.Setup(api => api.SearchAssetsAsync(It.Is<MetadataSearchDto>(d => d.AlbumIds.Contains(album1Id)), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SearchResponseDto { Assets = new SearchAssetResponseDto { Items = new List<AssetResponseDto> { assetA, assetB, assetD }, Total = 3 } });
+        _mockImmichApi.Setup(api => api.SearchAssetsAsync(It.Is<MetadataSearchDto>(d => d.AlbumIds.Contains(excludedAlbumId)), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SearchResponseDto { Assets = new SearchAssetResponseDto { Items = new List<AssetResponseDto> { assetB, assetC }, Total = 2 } });
 
         // Act
-        var result = (await _albumAssetsPool.TestLoadAssets()).ToList();
+        var result = (await _albumAssetsPool.GetAssets(25)).ToList();
 
         // Assert
         Assert.That(result.Count, Is.EqualTo(2));
-        Assert.That(result.Any(a => a.Id == "A"));
-        Assert.That(result.Any(a => a.Id == "D"));
-        _mockImmichApi.Verify(api => api.GetAlbumInfoAsync(album1Id, null, null, It.IsAny<CancellationToken>()), Times.Once);
-        _mockImmichApi.Verify(api => api.GetAlbumInfoAsync(excludedAlbumId, null, null, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.That(result.Any(a => a.Id == FixtureHelpers.GuidFor("A")));
+        Assert.That(result.Any(a => a.Id == FixtureHelpers.GuidFor("D")));
+        _mockImmichApi.Verify(api => api.SearchAssetsAsync(It.Is<MetadataSearchDto>(d => d.AlbumIds.Contains(album1Id)), It.IsAny<CancellationToken>()), Times.Once);
+        _mockImmichApi.Verify(api => api.SearchAssetsAsync(It.Is<MetadataSearchDto>(d => d.AlbumIds.Contains(excludedAlbumId)), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Test]
@@ -76,11 +71,11 @@ public class AlbumAssetsPoolTests
     {
         _mockAccountSettings.SetupGet(s => s.Albums).Returns(new List<Guid>());
         _mockAccountSettings.SetupGet(s => s.ExcludedAlbums).Returns(new List<Guid> { Guid.NewGuid() });
-        _mockImmichApi.Setup(api => api.GetAlbumInfoAsync(It.IsAny<Guid>(), null, null, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AlbumResponseDto { Assets = new List<AssetResponseDto> { CreateAsset("excluded_only") } });
+        _mockImmichApi.Setup(api => api.SearchAssetsAsync(It.IsAny<MetadataSearchDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SearchResponseDto { Assets = new SearchAssetResponseDto { Items = new List<AssetResponseDto> { CreateAsset("excluded_only") }, Total = 1 } });
 
 
-        var result = (await _albumAssetsPool.TestLoadAssets()).ToList();
+        var result = (await _albumAssetsPool.GetAssets(25)).ToList();
         Assert.That(result, Is.Empty);
     }
 
@@ -91,11 +86,33 @@ public class AlbumAssetsPoolTests
         _mockAccountSettings.SetupGet(s => s.Albums).Returns(new List<Guid> { album1Id });
         _mockAccountSettings.SetupGet(s => s.ExcludedAlbums).Returns(new List<Guid>()); // Empty excluded
 
-        _mockImmichApi.Setup(api => api.GetAlbumInfoAsync(album1Id, null, null, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AlbumResponseDto { Assets = new List<AssetResponseDto> { CreateAsset("A") } });
+        _mockImmichApi.Setup(api => api.SearchAssetsAsync(It.Is<MetadataSearchDto>(d => d.AlbumIds.Contains(album1Id)), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SearchResponseDto { Assets = new SearchAssetResponseDto { Items = new List<AssetResponseDto> { CreateAsset("A") }, Total = 1 } });
 
-        var result = (await _albumAssetsPool.TestLoadAssets()).ToList();
+        var result = (await _albumAssetsPool.GetAssets(25)).ToList();
         Assert.That(result.Count, Is.EqualTo(1));
-        Assert.That(result.Any(a => a.Id == "A"));
+        Assert.That(result.Any(a => a.Id == FixtureHelpers.GuidFor("A")));
+    }
+
+    [Test]
+    public async Task LoadAssets_NullAlbums_ReturnsEmpty()
+    {
+        _mockAccountSettings.SetupGet(s => s.Albums).Returns((List<Guid>)null);
+
+        var result = (await _albumAssetsPool.GetAssets(25)).ToList();
+        Assert.That(result, Is.Empty);
+
+        // the absence of an error, whereas before a null pointer exception would be thrown, indicates success.
+    }
+
+    [Test]
+    public async Task LoadAssets_NullExcludedAlbums_Succeeds()
+    {
+        _mockAccountSettings.SetupGet(s => s.ExcludedAlbums).Returns((List<Guid>)null);
+
+        var result = (await _albumAssetsPool.GetAssets(25)).ToList();
+        Assert.That(result, Is.Empty);
+
+        // the absence of an error, whereas before a null pointer exception would be thrown, indicates success.
     }
 }

@@ -11,7 +11,7 @@ public class FavoriteAssetsPool(IApiCache apiCache, ImmichApi immichApi, IAccoun
 
         int page = 1;
         int batchSize = 1000;
-        int total;
+        long total;
         do
         {
             var metadataBody = new MetadataSearchDto
@@ -19,11 +19,18 @@ public class FavoriteAssetsPool(IApiCache apiCache, ImmichApi immichApi, IAccoun
                 Page = page,
                 Size = batchSize,
                 IsFavorite = true,
-                Type = accountSettings.ShowVideosOnly ? AssetTypeEnum.VIDEO : 
-                       accountSettings.ShowVideos ? null : AssetTypeEnum.IMAGE,
                 WithExif = true,
                 WithPeople = true
             };
+
+            if (accountSettings.ShowVideosOnly)
+            {
+                metadataBody.Type = AssetTypeEnum.VIDEO;
+            }
+            else if (!accountSettings.ShowVideos)
+            {
+                metadataBody.Type = AssetTypeEnum.IMAGE;
+            }
 
             var favoriteInfo = await immichApi.SearchAssetsAsync(metadataBody, ct);
 

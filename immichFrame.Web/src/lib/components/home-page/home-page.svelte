@@ -3,19 +3,21 @@
 	import ProgressBar from '$lib/components/elements/progress-bar.svelte';
 	import { slideshowStore } from '$lib/stores/slideshow.store';
 	import { clientIdentifierStore, authSecretStore } from '$lib/stores/persist.store';
-	import { onDestroy, onMount, setContext } from 'svelte';
+	import { onDestroy, onMount, setContext, tick } from 'svelte';
 	import OverlayControls from '../elements/overlay-controls.svelte';
-	import ImageComponent from '../elements/image-component.svelte';
+	import AssetComponent from '../elements/asset-component.svelte';
+	import type AssetComponentInstance from '../elements/asset-component.svelte';
 	import { configStore } from '$lib/stores/config.store';
 	import ErrorElement from '../elements/error-element.svelte';
 	import Clock from '../elements/clock.svelte';
 	import Appointments from '../elements/appointments.svelte';
 	import LoadingElement from '../elements/LoadingElement.svelte';
 	import { page } from '$app/state';
-	import { extractColorFromImageUrl, extractColorFromVideo, generateComplementaryColor, generateTextColor, getContrastRatio, type ExtractedColor } from '$lib/utils/colorExtractor';
+	import { ProgressBarLocation, ProgressBarStatus } from '../elements/progress-bar.types';
+	import { isImageAsset, isVideoAsset } from '$lib/constants/asset-type';
 
-	interface ImagesState {
-		images: [string, api.AssetResponseDto, api.AlbumResponseDto[]][];
+	interface AssetsState {
+		assets: [string, api.AssetResponseDto, api.AssetFaceResponseDto[], api.AlbumResponseDto[]][];
 		error: boolean;
 		loaded: boolean;
 		split: boolean;
@@ -24,40 +26,53 @@
 
 	api.init();
 
-	// TODO: make this configurable?
-	const PRELOAD_IMAGES = 5;
+	const PRELOAD_ASSETS = 5;
+	const TRANSITION_WATCHDOG_MS = 10000;
+	const VIDEO_STALL_MS = 15000;
+	const CURSOR_HIDE_MS = 2000;
+	const RELOAD_ON_ERROR_MS = 30000;
 
-	let assetHistory: api.AssetResponseDto[] = [];
-	let assetBacklog: api.AssetResponseDto[] = [];
+	let assetHistory: api.AssetResponseDto[] = $state([]);
+	let assetBacklog: api.AssetResponseDto[] = $state([]);
 
-	let displayingAssets: api.AssetResponseDto[] = $state() as api.AssetResponseDto[];
+	let displayingAssets: api.AssetResponseDto[] = $state([]);
 
 	const { restartProgress, stopProgress, instantTransition } = slideshowStore;
 
 	let progressBarStatus: ProgressBarStatus = $state(ProgressBarStatus.Playing);
 	let progressBar: ProgressBar = $state() as ProgressBar;
+	let assetComponent: AssetComponentInstance = $state() as AssetComponentInstance;
+	let currentDuration: number = $state($configStore.interval ?? 20);
+
+	let consecutiveErrorSkips = 0;
+	let errorSkipScheduled = false;
+	let watchdogTimer: number | undefined;
+	let videoStallTimeout: number | undefined;
+	let timeoutId: number | undefined;
+
+	let userPaused: boolean = $state(false);
 
 	let error: boolean = $state(false);
 	let infoVisible: boolean = $state(false);
 	let authError: boolean = $state(false);
-	let errorMessage: string = $state() as string;
-	let imagesState: ImagesState = $state({
-		images: [],
+	let errorMessage: string = $state('');
+	let assetsState: AssetsState = $state({
+		assets: [],
 		error: false,
 		loaded: false,
 		split: false,
 		hasBday: false
 	});
-	let imagePromisesDict: Record<
+	let assetPromisesDict: Record<
 		string,
-		Promise<[string, api.AssetResponseDto, api.AlbumResponseDto[]]>
+		Promise<[string, api.AssetResponseDto, api.AssetFaceResponseDto[], api.AlbumResponseDto[]]>
 	> = {};
 
 	let unsubscribeRestart: () => void;
 	let unsubscribeStop: () => void;
+	let refreshInterval: number;
 
 	let cursorVisible = $state(true);
-	let timeoutId: number;
 
 	const clientIdentifier = page.url.searchParams.get('client');
 	const authsecret = page.url.searchParams.get('authsecret');
@@ -79,46 +94,50 @@
 
 	async function provideClose() {
 		infoVisible = false;
+		userPaused = false;
+		await assetComponent?.play?.();
 		await progressBar.play();
 	}
 
 	const showCursor = () => {
 		cursorVisible = true;
 		clearTimeout(timeoutId);
-		timeoutId = setTimeout(hideCursor, 2000);
+		timeoutId = window.setTimeout(hideCursor, CURSOR_HIDE_MS);
 	};
 
-	async function updateImagePromises() {
+	async function updateAssetPromises() {
 		for (let asset of displayingAssets) {
-			if (!(asset.id in imagePromisesDict)) {
-				imagePromisesDict[asset.id] = loadImage(asset);
+			if (!(asset.id in assetPromisesDict)) {
+				assetPromisesDict[asset.id] = loadAsset(asset);
 			}
 		}
-		for (let i = 0; i < PRELOAD_IMAGES; i++) {
+		for (let i = 0; i < PRELOAD_ASSETS; i++) {
 			if (i >= assetBacklog.length) {
 				break;
 			}
-			if (!(assetBacklog[i].id in imagePromisesDict)) {
-				imagePromisesDict[assetBacklog[i].id] = loadImage(assetBacklog[i]);
+			if (!(assetBacklog[i].id in assetPromisesDict)) {
+				assetPromisesDict[assetBacklog[i].id] = loadAsset(assetBacklog[i]);
 			}
 		}
-		// originally just deleted displayingAssets after they were no longer needed
-		// but this is more bulletproof to edge cases I think
-		for (let key in imagePromisesDict) {
-			if (
-				!(
-					displayingAssets.find((item) => item.id == key) ||
-					assetBacklog.find((item) => item.id == key)
-				)
-			) {
-				delete imagePromisesDict[key];
-			}
-		}
+		// Collect keys to remove first to avoid modifying dict during async iteration
+		const keysToRemove = Object.keys(assetPromisesDict).filter(
+			(key) =>
+				!displayingAssets.find((item) => item.id === key) &&
+				!assetBacklog.find((item) => item.id === key)
+		);
+
+		keysToRemove.forEach((key) => {
+			const promise = assetPromisesDict[key];
+			delete assetPromisesDict[key];
+			promise
+				.then(([url]) => revokeObjectUrl(url))
+				.catch((err) => console.warn('Failed to resolve asset during cleanup:', err));
+		});
 	}
 
 	async function loadAssets() {
 		try {
-			let assetRequest = await api.getAsset();
+			let assetRequest = await api.getAssets();
 
 			if (assetRequest.status != 200) {
 				if (assetRequest.status == 401) {
@@ -129,247 +148,144 @@
 			}
 
 			error = false;
-			assetBacklog = assetRequest.data;
+			assetBacklog = assetRequest.data.filter(
+				(asset) => isImageAsset(asset) || isVideoAsset(asset)
+			);
 		} catch {
 			error = true;
 		}
 	}
 
+	let isHandlingAssetTransition = $state(false);
+	let transitionEpoch = 0;
+	let pendingTransition: { previous: boolean; instant: boolean } | null = $state(null);
+
 	const handleDone = async (previous: boolean = false, instant: boolean = false) => {
-		progressBar.restart(false);
-		$instantTransition = instant;
-		if (previous) await getPreviousAssets();
-		else await getNextAssets();
-		progressBar.play();
+		if (isHandlingAssetTransition) {
+			pendingTransition = { previous, instant };
+			return;
+		}
+
+		const currentEpoch = ++transitionEpoch;
+		isHandlingAssetTransition = true;
+
+		clearTimeout(watchdogTimer);
+		clearTimeout(videoStallTimeout);
+		// Watchdog: If the transition (fetching/loading assets) hangs, force-release the lock.
+		watchdogTimer = window.setTimeout(() => {
+			if (currentEpoch === transitionEpoch && isHandlingAssetTransition) {
+				console.error('Transition watchdog triggered: Force-resetting lock due to hang');
+				isHandlingAssetTransition = false;
+
+				// Bump the epoch so the original (still-awaiting) transition becomes a no-op
+				// when/if it eventually resolves, and force a fresh advance.
+				transitionEpoch++;
+				const next = pendingTransition ?? { previous: false, instant: true };
+				pendingTransition = null;
+				handleDone(next.previous, next.instant).catch((err) => {
+					console.error('handleDone failed:', err);
+					isHandlingAssetTransition = false;
+				});
+			}
+		}, TRANSITION_WATCHDOG_MS);
+
+		try {
+			userPaused = false;
+			progressBar.restart(false);
+			$instantTransition = instant;
+			if (previous) await getPreviousAssets();
+			else await getNextAssets();
+			await tick();
+
+			if (currentEpoch !== transitionEpoch) return;
+
+			await assetComponent?.play?.();
+			progressBar.play();
+			consecutiveErrorSkips = 0;
+		} finally {
+			if (currentEpoch === transitionEpoch) {
+				isHandlingAssetTransition = false;
+				clearTimeout(watchdogTimer);
+
+				if (pendingTransition) {
+					const next = pendingTransition;
+					pendingTransition = null;
+					handleDone(next.previous, next.instant).catch((err) => {
+						console.error('handleDone failed:', err);
+						isHandlingAssetTransition = false;
+					});
+				}
+			}
+		}
 	};
 
 	async function getNextAssets() {
-		if (!assetBacklog || assetBacklog.length < 1) {
+		if (!assetBacklog.length) {
 			await loadAssets();
 		}
 
-		if (!error && assetBacklog.length == 0) {
+		if (!error && !assetBacklog.length) {
 			error = true;
 			errorMessage = 'No assets were found! Check your configuration.';
 			return;
 		}
 
-		let next: api.AssetResponseDto[];
-		if (
-			$configStore.layout?.trim().toLowerCase() == 'splitview' &&
-			assetBacklog.length > 1 &&
-			isHorizontal(assetBacklog[0]) &&
-			isHorizontal(assetBacklog[1]) &&
-			!isVideo(assetBacklog[0]) &&
-			!isVideo(assetBacklog[1])
-		) {
-			next = assetBacklog.splice(0, 2);
-		} else {
-			next = assetBacklog.splice(0, 1);
-		}
-		assetBacklog = [...assetBacklog];
+		const useSplit = shouldUseSplitView(assetBacklog);
+		const next = assetBacklog.splice(0, useSplit ? 2 : 1);
 
-		if (displayingAssets) {
-			// Push to History
+		if (displayingAssets.length) {
 			assetHistory.push(...displayingAssets);
 		}
 
-		// History max 250 Items
 		if (assetHistory.length > 250) {
-			assetHistory = assetHistory.splice(assetHistory.length - 250, 250);
+			assetHistory = assetHistory.slice(-250);
 		}
 
 		displayingAssets = next;
-		updateImagePromises();
-		imagesState = await loadImages(next);
-		
-		// Update theme colors based on the new asset
-		await updateThemeFromAsset();
+		await updateAssetPromises();
+		assetsState = await pickAssets(next);
 	}
 
-	const handleVideoEnd = async () => {
-		// Automatically advance to next asset when video ends
-		await handleDone(false, true);
-		infoVisible = false;
-	};
-
 	async function getPreviousAssets() {
-		if (!assetHistory || assetHistory.length < 1) {
+		if (!assetHistory.length) {
 			return;
 		}
 
-		let next: api.AssetResponseDto[];
-		if (
-			$configStore.layout?.trim().toLowerCase() == 'splitview' &&
-			assetHistory.length > 1 &&
-			isHorizontal(assetHistory[assetHistory.length - 1]) &&
-			isHorizontal(assetHistory[assetHistory.length - 2]) &&
-			!isVideo(assetHistory[assetHistory.length - 1]) &&
-			!isVideo(assetHistory[assetHistory.length - 2])
-		) {
-			next = assetHistory.splice(assetHistory.length - 2, 2);
-		} else {
-			next = assetHistory.splice(assetHistory.length - 1, 1);
-		}
+		const useSplit = shouldUseSplitView(assetHistory.slice(-2));
+		const next = assetHistory.splice(useSplit ? -2 : -1);
 
-		assetHistory = [...assetHistory];
-
-		// Unshift to Backlog
-		if (displayingAssets) {
+		if (displayingAssets.length) {
 			assetBacklog.unshift(...displayingAssets);
 		}
+
 		displayingAssets = next;
-		updateImagePromises();
-		imagesState = await loadImages(next);
-		
-		// Update theme colors based on the new asset
-		await updateThemeFromAsset();
+		await updateAssetPromises();
+		assetsState = await pickAssets(next);
 	}
 
-	function isHorizontal(asset: api.AssetResponseDto) {
+	function isPortrait(asset: api.AssetResponseDto) {
+		if (isVideoAsset(asset)) {
+			return false;
+		}
+
 		const isFlipped = (orientation: number) => [5, 6, 7, 8].includes(orientation);
-		let imageHeight = asset.exifInfo?.exifImageHeight ?? 0;
-		let imageWidth = asset.exifInfo?.exifImageWidth ?? 0;
+		let assetHeight = asset.exifInfo?.exifImageHeight ?? 0;
+		let assetWidth = asset.exifInfo?.exifImageWidth ?? 0;
 		if (isFlipped(Number(asset.exifInfo?.orientation ?? 0))) {
-			[imageHeight, imageWidth] = [imageWidth, imageHeight];
+			[assetHeight, assetWidth] = [assetWidth, assetHeight];
 		}
-		return imageHeight > imageWidth; // or imageHeight > imageWidth * 1.25;
+		return assetHeight > assetWidth;
 	}
 
-	function isVideo(asset: api.AssetResponseDto) {
-		return asset.type === 1; // AssetTypeEnum.VIDEO = 1
-	}
-
-	/**
-	 * Extract color from the currently displayed asset and update the theme
-	 */
-	async function updateThemeFromAsset() {
-		if (!displayingAssets || displayingAssets.length === 0) return;
-
-		const primaryAsset = displayingAssets[0]; // Use first asset for theming
-		
-		try {
-			let extractedColor: ExtractedColor;
-			
-			// Prepare color extraction options with fallback from configuration
-			const extractionOptions = {
-				fallbackColor: $configStore.primaryColor || '#f5deb3',
-				analyzePortraitVideo: true,
-				sampleLowerThird: true,
-				handleSplitView: displayingAssets.length === 2,
-				minSaturation: 0.2,
-				minLuminance: 0.15,
-				maxDarkness: 0.7
-			};
-			
-			if (isVideo(primaryAsset)) {
-				// For videos, we'll extract from the video element once it's loaded
-				// This will be called from the video component when ready
-				return;
-			} else {
-				// For images, extract color from the loaded image
-				const imagePromise = imagePromisesDict[primaryAsset.id];
-				if (imagePromise) {
-					const [imageUrl] = await imagePromise;
-					if (imageUrl) {
-						extractedColor = await extractColorFromImageUrl(imageUrl, extractionOptions);
-						updateThemeColors(extractedColor);
-					}
-				}
-			}
-		} catch (error) {
-			console.warn('Failed to extract color from asset:', error);
-			
-			// Fallback to configuration primary color if extraction fails
-			if ($configStore.primaryColor) {
-				try {
-					const fallbackExtractedColor = await extractColorFromImageUrl('', {
-						fallbackColor: $configStore.primaryColor,
-						useFallbackOnly: true
-					});
-					updateThemeColors(fallbackExtractedColor);
-				} catch (fallbackError) {
-					console.warn('Failed to use fallback color:', fallbackError);
-				}
-			}
-		}
-	}
-
-	/**
-	 * Update CSS custom properties with extracted colors
-	 */
-	function updateThemeColors(baseColor: ExtractedColor) {
-		// Set the primary color to the extracted dominant color
-		document.documentElement.style.setProperty('--primary-color', baseColor.hex);
-		
-		// Generate and set a complementary color for UI elements
-		const complementaryColor = generateComplementaryColor(baseColor);
-		document.documentElement.style.setProperty('--complementary-color', complementaryColor.hex);
-		
-		// Generate optimal text color with enhanced contrast checking
-		const textColor = generateTextColor(baseColor.hex);
-		document.documentElement.style.setProperty('--text-color', textColor);
-		
-		// Calculate contrast ratios for dynamic text enhancement selection
-		const contrastRatio = getContrastRatio(complementaryColor.hex, baseColor.hex);
-		let shadowClass = 'none'; // default to no shadow for clean text
-		let textEnhancement = 'bg-black/20'; // background-based enhancement
-		
-		if (contrastRatio < 2) {
-			shadowClass = 'outline'; // Crisp outline for very poor contrast
-			textEnhancement = 'bg-black/40 border border-white/20';
-		} else if (contrastRatio < 3) {
-			shadowClass = 'stroke-light'; // Light stroke for poor contrast  
-			textEnhancement = 'bg-black/30 border border-white/15';
-		} else if (contrastRatio < 4.5) {
-			shadowClass = 'none'; // No shadow for moderate contrast
-			textEnhancement = 'bg-black/25 border border-white/10';
-		} else {
-			shadowClass = 'none'; // No shadow for good contrast
-			textEnhancement = 'bg-black/15';
-		}
-		
-		// Set dynamic enhancement classes for components to use
-		document.documentElement.style.setProperty('--text-shadow-class', shadowClass);
-		document.documentElement.style.setProperty('--text-enhancement', textEnhancement);
-		
-		console.log(`Theme updated - Primary: ${baseColor.hex}, Complementary: ${complementaryColor.hex}, Text: ${textColor}, Contrast: ${contrastRatio.toFixed(2)}, Shadow: ${shadowClass}`);
-	}
-
-	/**
-	 * Handle color extraction from video elements
-	 */
-	function extractVideoColor(videoElement: HTMLVideoElement) {
-		try {
-			// Prepare color extraction options with fallback from configuration
-			const extractionOptions = {
-				fallbackColor: $configStore.primaryColor || '#f5deb3',
-				analyzePortraitVideo: true,
-				sampleLowerThird: true,
-				handleSplitView: displayingAssets.length === 2,
-				minSaturation: 0.2,
-				minLuminance: 0.15,
-				maxDarkness: 0.7
-			};
-			
-			const extractedColor = extractColorFromVideo(videoElement, extractionOptions);
-			updateThemeColors(extractedColor);
-		} catch (error) {
-			console.warn('Failed to extract color from video:', error);
-			
-			// Fallback to configuration primary color if extraction fails
-			if ($configStore.primaryColor) {
-				try {
-					const fallbackExtractedColor = extractColorFromVideo(videoElement, {
-						fallbackColor: $configStore.primaryColor,
-						useFallbackOnly: true
-					});
-					updateThemeColors(fallbackExtractedColor);
-				} catch (fallbackError) {
-					console.warn('Failed to use fallback color for video:', fallbackError);
-				}
-			}
-		}
+	function shouldUseSplitView(assets: api.AssetResponseDto[]): boolean {
+		return (
+			$configStore.layout?.trim().toLowerCase() === 'splitview' &&
+			assets.length > 1 &&
+			isImageAsset(assets[0]) &&
+			isImageAsset(assets[1]) &&
+			isPortrait(assets[0]) &&
+			isPortrait(assets[1])
+		);
 	}
 
 	function hasBirthday(assets: api.AssetResponseDto[]) {
@@ -377,7 +293,7 @@
 		let hasBday: boolean = false;
 
 		for (let asset of assets) {
-			for (let person of asset.people ?? new Array()) {
+			for (let person of asset.people ?? []) {
 				let birthdate = new Date(person.birthDate ?? '');
 				if (birthdate.getDate() === today.getDate() && birthdate.getMonth() === today.getMonth()) {
 					hasBday = true;
@@ -390,23 +306,49 @@
 		return hasBday;
 	}
 
-	async function loadImages(assets: api.AssetResponseDto[]) {
-		let newImages = [];
+	function updateCurrentDuration(assets: api.AssetResponseDto[]) {
+		const durations = assets
+			.map((asset) => getAssetDurationSeconds(asset))
+			.filter((value) => value > 0);
+		const fallback = $configStore.interval ?? 20;
+		currentDuration = durations.length ? Math.max(...durations) : fallback;
+	}
+
+	function getAssetDurationSeconds(asset: api.AssetResponseDto) {
+		if (isVideoAsset(asset)) {
+			const parsed = parseAssetDuration(asset.duration);
+			const fallback = $configStore.interval ?? 20;
+			return parsed > 0 ? parsed : fallback;
+		}
+		return $configStore.interval ?? 20;
+	}
+
+	function parseAssetDuration(duration?: number | null) {
+		if (!duration || duration <= 0) {
+			return 0;
+		}
+		return duration / 1000; // milliseconds → seconds
+	}
+
+	async function pickAssets(assets: api.AssetResponseDto[]) {
+		let newAssets = [];
 		try {
+			updateCurrentDuration(assets);
 			for (let asset of assets) {
-				let img = await imagePromisesDict[asset.id];
-				newImages.push(img);
+				let img = await assetPromisesDict[asset.id];
+				newAssets.push(img);
 			}
 			return {
-				images: newImages,
+				assets: newAssets,
 				error: false,
 				loaded: true,
-				split: assets.length == 2,
+				split: assets.length == 2 && assets.every(isImageAsset),
 				hasBday: hasBirthday(assets)
 			};
 		} catch {
+			updateCurrentDuration([]);
 			return {
-				images: [],
+				assets: [],
 				error: true,
 				loaded: false,
 				split: false,
@@ -415,63 +357,85 @@
 		}
 	}
 
-	async function loadImage(assetResponse: api.AssetResponseDto) {
-		let url: string;
-		
-		// Handle videos differently than images
-		if (assetResponse.type === 1) { // AssetTypeEnum.VIDEO = 1
-			// For videos, create a direct URL to stream the video
-			url = `/api/Asset/${assetResponse.id}/Image?clientIdentifier=${encodeURIComponent($clientIdentifierStore)}`;
+	async function loadAsset(assetResponse: api.AssetResponseDto) {
+		let assetUrl: string;
+
+		if (isVideoAsset(assetResponse)) {
+			// Stream videos directly instead of preloading
+			assetUrl = api.getAssetStreamUrl(
+				assetResponse.id,
+				$clientIdentifierStore,
+				assetResponse.type
+			);
 		} else {
-			// For images, use the existing blob approach
-			let req = await api.getImage(assetResponse.id, { clientIdentifier: $clientIdentifierStore });
+			// Preload images as blobs
+			const req = await api.getAsset(assetResponse.id, {
+				clientIdentifier: $clientIdentifierStore,
+				assetType: assetResponse.type
+			});
 			if (req.status != 200) {
-				return ['', assetResponse, []] as [string, api.AssetResponseDto, api.AlbumResponseDto[]];
+				throw new Error(`Failed to load asset ${assetResponse.id}: status ${req.status}`);
 			}
-			url = getImageUrl(req.data);
+			assetUrl = getObjectUrl(req.data);
 		}
 
 		let album: api.AlbumResponseDto[] | null = null;
 		if ($configStore.showAlbumName) {
-			let albumReq = await api.getAlbumInfo(assetResponse.id, {
+			const albumReq = await api.getAlbumInfo(assetResponse.id, {
 				clientIdentifier: $clientIdentifierStore
 			});
-			album = albumReq.data;
-		}
-
-		if ($configStore.showAlbumName && album == null) {
-			return ['', assetResponse, []] as [string, api.AssetResponseDto, api.AlbumResponseDto[]];
+			album = albumReq.data ?? [];
 		}
 
 		// if the people array is already populated, there is no need to call the API again
 		if ($configStore.showPeopleDesc && (assetResponse.people ?? []).length == 0) {
-			let assetInfoRequest = await api.getAssetInfo(assetResponse.id, {
+			const assetInfoRequest = await api.getAssetInfo(assetResponse.id, {
 				clientIdentifier: $clientIdentifierStore
 			});
 			assetResponse.people = assetInfoRequest.data.people;
-			// assetResponse.exifInfo = assetInfoRequest.data.exifInfo;
 		}
 
-		return [url, assetResponse, album] as [
+		let faces: api.AssetFaceResponseDto[] = [];
+		if (!isVideoAsset(assetResponse) && ($configStore.imageZoom || $configStore.imagePan)) {
+			const facesRequest = await api.getAssetFaces(assetResponse.id, {
+				clientIdentifier: $clientIdentifierStore
+			});
+			faces = facesRequest.data;
+		}
+
+		return [assetUrl, assetResponse, faces, album] as [
 			string,
 			api.AssetResponseDto,
+			api.AssetFaceResponseDto[],
 			api.AlbumResponseDto[]
 		];
 	}
 
-	function getImageUrl(image: Blob) {
+	function getObjectUrl(image: Blob) {
 		return URL.createObjectURL(image);
+	}
+
+	function revokeObjectUrl(url: string) {
+		// Only revoke blob URLs, not streaming URLs
+		if (!url.startsWith('blob:')) return;
+		try {
+			URL.revokeObjectURL(url);
+		} catch {
+			console.warn('Failed to revoke object URL:', url);
+		}
 	}
 
 	onMount(() => {
 		window.addEventListener('mousemove', showCursor);
 		window.addEventListener('click', showCursor);
-		
-		// Set initial fallback colors (will be overridden by dynamic extraction)
+
+		// 30 second reload on error
+		refreshInterval = window.setInterval(() => {
+			if (error) window.location.reload();
+		}, RELOAD_ON_ERROR_MS);
+
 		if ($configStore.primaryColor) {
 			document.documentElement.style.setProperty('--primary-color', $configStore.primaryColor);
-			const complementaryColor = generateTextColor($configStore.primaryColor);
-			document.documentElement.style.setProperty('--complementary-color', complementaryColor);
 		}
 
 		if ($configStore.secondaryColor) {
@@ -485,12 +449,14 @@
 		unsubscribeRestart = restartProgress.subscribe((value) => {
 			if (value) {
 				progressBar.restart(value);
+				assetComponent?.play?.();
 			}
 		});
 
 		unsubscribeStop = stopProgress.subscribe((value) => {
 			if (value) {
 				progressBar.restart(false);
+				assetComponent?.pause?.();
 			}
 		});
 
@@ -499,10 +465,14 @@
 		return () => {
 			window.removeEventListener('mousemove', showCursor);
 			window.removeEventListener('click', showCursor);
+			window.clearInterval(refreshInterval);
+			window.clearTimeout(timeoutId);
+			window.clearTimeout(videoStallTimeout);
+			window.clearTimeout(watchdogTimer);
 		};
 	});
 
-	onDestroy(() => {
+	onDestroy(async () => {
 		if (unsubscribeRestart) {
 			unsubscribeRestart();
 		}
@@ -510,6 +480,17 @@
 		if (unsubscribeStop) {
 			unsubscribeStop();
 		}
+
+		const revokes = Object.values(assetPromisesDict).map(async (p) => {
+			try {
+				const [url] = await p;
+				revokeObjectUrl(url);
+			} catch (err) {
+				console.warn('Failed to resolve asset during destroy cleanup:', err);
+			}
+		});
+		await Promise.allSettled(revokes);
+		assetPromisesDict = {};
 	});
 </script>
 
@@ -518,20 +499,59 @@
 		<ErrorElement {authError} message={errorMessage} />
 	{:else if displayingAssets}
 		<div class="absolute h-screen w-screen">
-			<ImageComponent
+			<AssetComponent
 				showLocation={$configStore.showImageLocation}
-				interval={$configStore.interval}
+				interval={currentDuration}
 				showPhotoDate={$configStore.showPhotoDate}
 				showImageDesc={$configStore.showImageDesc}
 				showPeopleDesc={$configStore.showPeopleDesc}
+				showTagsDesc={$configStore.showTagsDesc}
 				showAlbumName={$configStore.showAlbumName}
-				{...imagesState}
+				{...assetsState}
 				imageFill={$configStore.imageFill}
 				imageZoom={$configStore.imageZoom}
 				imagePan={$configStore.imagePan}
+				bind:this={assetComponent}
 				bind:showInfo={infoVisible}
-				onVideoEnd={handleVideoEnd}
-				onColorExtracted={extractVideoColor}
+				playAudio={$configStore.playAudio}
+				onVideoWaiting={async () => {
+					await progressBar.pause();
+					clearTimeout(videoStallTimeout);
+					if (userPaused) return;
+
+					videoStallTimeout = window.setTimeout(
+						() => {
+							if (!userPaused) {
+								console.warn('Video stalled, skipping...');
+								handleDone(false, true);
+							}
+						},
+						Math.max(5000, Math.min(VIDEO_STALL_MS, currentDuration * 1000))
+					);
+				}}
+				onVideoPlaying={async () => {
+					consecutiveErrorSkips = 0;
+					clearTimeout(videoStallTimeout);
+					if (!userPaused) {
+						await progressBar.play();
+					}
+				}}
+				onAssetError={async () => {
+					if (errorSkipScheduled) return;
+					errorSkipScheduled = true;
+
+					consecutiveErrorSkips++;
+					if (consecutiveErrorSkips > 10) {
+						error = true;
+						errorMessage =
+							'Too many consecutive asset load failures. Please check your network or server connection.';
+						errorSkipScheduled = false;
+						return;
+					}
+
+					await handleDone(false, true);
+					errorSkipScheduled = false;
+				}}
 			/>
 		</div>
 
@@ -553,17 +573,25 @@
 			pause={async () => {
 				infoVisible = false;
 				if (progressBarStatus == ProgressBarStatus.Paused) {
+					userPaused = false;
+					await assetComponent?.play?.();
 					await progressBar.play();
 				} else {
+					userPaused = true;
+					await assetComponent?.pause?.();
 					await progressBar.pause();
 				}
 			}}
 			showInfo={async () => {
 				if (infoVisible) {
 					infoVisible = false;
+					userPaused = false;
+					await assetComponent?.play?.();
 					await progressBar.play();
 				} else {
 					infoVisible = true;
+					userPaused = true;
+					await assetComponent?.pause?.();
 					await progressBar.pause();
 				}
 			}}
@@ -574,7 +602,7 @@
 
 		<ProgressBar
 			autoplay
-			duration={$configStore.interval}
+			duration={currentDuration}
 			hidden={!$configStore.showProgressBar}
 			location={ProgressBarLocation.Bottom}
 			bind:this={progressBar}

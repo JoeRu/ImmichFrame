@@ -4,6 +4,7 @@ using ImmichFrame.Core.Exceptions;
 using ImmichFrame.Core.Helpers;
 using ImmichFrame.Core.Interfaces;
 using ImmichFrame.Core.Logic.AccountSelection;
+using ImmichFrame.Core.Models;
 using Microsoft.Extensions.Logging;
 
 namespace ImmichFrame.Core.Logic;
@@ -35,8 +36,14 @@ public class MultiImmichFrameLogicDelegate : IImmichFrameLogic
 
 
     public async Task<IEnumerable<AssetResponseDto>> GetAssets()
-       // Preserve asset order from selection strategy (required for chronological grouping, no shuffling here)
-        => (await _accountSelectionStrategy.GetAssets()).Select(it => it.ToAsset());
+    {
+        // Preserve asset order from selection strategy when chronological grouping is
+        // enabled (required for chronological grouping, no shuffling here); otherwise
+        // shuffle for variety.
+        var assets = (await _accountSelectionStrategy.GetAssets()).ToList();
+        return (_serverSettings.GeneralSettings.ChronologicalImagesCount > 0 ? assets : assets.Shuffle())
+            .Select(it => it.ToAsset());
+    }
 
 
     public Task<AssetResponseDto> GetAssetInfoById(Guid assetId)
@@ -45,13 +52,16 @@ public class MultiImmichFrameLogicDelegate : IImmichFrameLogic
             async logic => (await logic.GetAssetInfoById(assetId)).WithAccount(logic),
             (logic, assetInfo) => Task.FromResult(assetInfo.WithAccount(logic)));
 
+    public Task<IEnumerable<AssetFaceResponseDto>> GetAssetFacesById(Guid assetId)
+        => _accountSelectionStrategy.ForAsset(assetId, async logic => await logic.GetAssetFacesById(assetId));
+
 
     public Task<IEnumerable<AlbumResponseDto>> GetAlbumInfoById(Guid assetId)
         => GetWithFallback(assetId, logic => logic.GetAlbumInfoById(assetId));
 
 
-    public Task<(string fileName, string ContentType, Stream fileStream)> GetImage(Guid assetId)
-        => GetWithFallback(assetId, logic => logic.GetImage(assetId));
+    public Task<AssetResponse> GetAsset(Guid assetId, AssetTypeEnum? assetType = null, string? rangeHeader = null)
+        => GetWithFallback(assetId, logic => logic.GetAsset(assetId, assetType, rangeHeader));
 
     private async Task<T> GetWithFallback<T>(
         Guid assetId,
@@ -98,7 +108,7 @@ public class MultiImmichFrameLogicDelegate : IImmichFrameLogic
     {
         try
         {
-            await _tracker.RecordAssetLocation(account, assetId.ToString());
+            await _tracker.RecordAssetLocation(account, assetId);
         }
         catch (Exception e)
         {

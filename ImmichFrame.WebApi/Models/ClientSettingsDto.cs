@@ -16,6 +16,7 @@ public class ClientSettingsDto
     public string? PhotoDateFormat { get; set; }
     public bool ShowImageDesc { get; set; }
     public bool ShowPeopleDesc { get; set; }
+    public bool ShowTagsDesc { get; set; }
     public bool ShowAlbumName { get; set; }
     public bool ShowImageLocation { get; set; }
     public string? ImageLocationFormat { get; set; }
@@ -29,6 +30,7 @@ public class ClientSettingsDto
     public bool ImageZoom { get; set; }
     public bool ImagePan { get; set; }
     public bool ImageFill { get; set; }
+    public bool PlayAudio { get; set; }
     public string Layout { get; set; }
     public string Language { get; set; }
 
@@ -47,6 +49,7 @@ public class ClientSettingsDto
         dto.PhotoDateFormat = generalSettings.PhotoDateFormat;
         dto.ShowImageDesc = generalSettings.ShowImageDesc;
         dto.ShowPeopleDesc = generalSettings.ShowPeopleDesc;
+        dto.ShowTagsDesc = generalSettings.ShowTagsDesc;
         dto.ShowAlbumName = generalSettings.ShowAlbumName;
         dto.ShowImageLocation = generalSettings.ShowImageLocation;
         dto.ImageLocationFormat = generalSettings.ImageLocationFormat;
@@ -59,6 +62,7 @@ public class ClientSettingsDto
         dto.ImageZoom = generalSettings.ImageZoom;
         dto.ImagePan = generalSettings.ImagePan;
         dto.ImageFill = generalSettings.ImageFill;
+        dto.PlayAudio = generalSettings.PlayAudio;
         dto.Layout = generalSettings.Layout;
         dto.ChronologicalImagesCount = generalSettings.ChronologicalImagesCount;
         dto.Language = generalSettings.Language;

@@ -1,5 +1,8 @@
+using System;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
 using ImmichFrame.WebApi.Tests.Mocks;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -10,6 +13,7 @@ using Moq.Protected;
 using ImmichFrame.Core.Api;
 using ImmichFrame.WebApi.Models;
 using ImmichFrame.Core.Interfaces; // Added this back
+using System.Text.Json;
 using NUnit.Framework;
 
 namespace ImmichFrame.WebApi.Tests.Controllers
@@ -103,49 +107,23 @@ namespace ImmichFrame.WebApi.Tests.Controllers
         {
             // Arrange
             var expectedAssetId = Guid.NewGuid();
-            var assetDtoJson = $@"
-            {{
-                ""id"": ""{expectedAssetId}"",
-                ""originalPath"": ""/path/to/image.jpg"",
-                ""type"": ""IMAGE"",
-                ""fileCreatedAt"": ""2023-10-26T10:00:00Z"",
-                ""fileModifiedAt"": ""2023-10-26T10:00:00Z"",
-                ""isFavorite"": true,
-                ""duration"": ""0:00:00"",
-                ""checksum"": ""testchecksum"",
-                ""deviceAssetId"": ""testDeviceAssetId"",
-                ""deviceId"": ""testDeviceId"",
-                ""ownerId"": ""testOwnerId"",
-                ""originalFileName"": ""image.jpg"",
-                ""localDateTime"": ""2023-10-26T10:00:00Z"",
-                ""visibility"": ""timeline"",
-                ""hasMetadata"": true,
-                ""isArchived"": false,
-                ""isOffline"": false,
-                ""isTrashed"": false,
-                ""thumbhash"": ""I0cMCQS94XmImZeXmYd3d3g="",
-                ""updatedAt"": ""2023-10-26T10:00:00Z""
-            }}";
 
-            // JSON structure for SearchResponseDto
-            var jsonResponse = $@"
-            {{
-                ""albums"": {{
-                    ""count"": 0,
-                    ""items"": [],
-                    ""total"": 0,
-                    ""facets"": []
-                }},
-                ""assets"": {{
-                    ""count"": 1,
-                    ""items"": [
-                        {assetDtoJson}
-                    ],
-                    ""total"": 1,
-                    ""facets"": [],
-                    ""nextPage"": null
-                }}
-            }}";
+            // Build the mock response from the generated DTOs so the test fails at
+            // compile time (not at runtime) if the OpenAPI schema changes.
+            var searchResponse = new SearchResponseDto
+            {
+                Assets = new SearchAssetResponseDto
+                {
+                    Count = 1,
+                    Total = 1,
+                    Items = { BuildAssetResponse(expectedAssetId) },
+                    NextPage = null,
+                },
+                // Albums is already initialised to an empty SearchAlbumResponseDto.
+            };
+
+            var jsonResponse = JsonSerializer.Serialize(searchResponse);
+            var assetDtoJson = JsonSerializer.Serialize(BuildAssetResponse(expectedAssetId));
 
             // Setup for SearchAssetsAsync
             _mockHttpMessageHandler.Protected()
@@ -199,5 +177,110 @@ namespace ImmichFrame.WebApi.Tests.Controllers
             // A more robust check would be to deserialize the response and check the asset ID.
             Assert.That(content, Is.Not.Empty);
         }
+
+        // Builds a valid AssetResponseDto from the generated client types. Only the
+        // fields required by the schema are set; pass type/duration to reuse this for
+        // video assets. Changes to the OpenAPI schema surface here as compile errors.
+        private static AssetResponseDto BuildAssetResponse(
+            Guid id,
+            AssetTypeEnum type = AssetTypeEnum.IMAGE,
+            int? duration = null)
+        {
+            var timestamp = DateTimeOffset.Parse("2023-10-26T10:00:00Z");
+            return new AssetResponseDto
+            {
+                Id = id,
+                OwnerId = Guid.NewGuid(),
+                Type = type,
+                OriginalPath = "/path/to/image.jpg",
+                OriginalFileName = "image.jpg",
+                Checksum = "testchecksum",
+                Thumbhash = "I0cMCQS94XmImZeXmYd3d3g=",
+                Visibility = AssetVisibility.Timeline,
+                Duration = duration,
+                Width = 1920,
+                Height = 1080,
+                IsFavorite = true,
+                HasMetadata = true,
+                FileCreatedAt = timestamp,
+                FileModifiedAt = timestamp,
+                LocalDateTime = timestamp,
+                CreatedAt = timestamp,
+                UpdatedAt = timestamp,
+            };
+        }
+
+        // TODO: Fix Test
+        // [Test]
+        // public async Task GetImage_VideoAsset_ReturnsVideoStream()
+        // {
+        //     // Arrange
+        //     var videoAssetId = Guid.NewGuid();
+        //     var assetInfoJson = $@"
+        //     {{
+        //         ""id"": ""{videoAssetId}"",
+        //         ""originalFileName"": ""test-video.mp4"",
+        //         ""type"": ""VIDEO"",
+        //         ""fileCreatedAt"": ""2023-10-26T10:00:00Z"",
+        //         ""fileModifiedAt"": ""2023-10-26T10:00:00Z"",
+        //         ""duration"": ""0:00:05"",
+        //         ""checksum"": ""checksum"",
+        //         ""deviceAssetId"": ""deviceAsset"",
+        //         ""deviceId"": ""device"",
+        //         ""ownerId"": ""owner"",
+        //         ""localDateTime"": ""2023-10-26T10:00:00Z"",
+        //         ""visibility"": ""timeline"",
+        //         ""hasMetadata"": true,
+        //         ""isArchived"": false,
+        //         ""isOffline"": false,
+        //         ""isTrashed"": false,
+        //         ""updatedAt"": ""2023-10-26T10:00:00Z""
+        //     }}";
+
+        //     _mockHttpMessageHandler.Protected()
+        //         .Setup<Task<HttpResponseMessage>>(
+        //             "SendAsync",
+        //             ItExpr.Is<HttpRequestMessage>(req =>
+        //                 req.Method == HttpMethod.Get &&
+        //                 req.RequestUri!.ToString().EndsWith($"/assets/{videoAssetId}", StringComparison.OrdinalIgnoreCase)),
+        //             ItExpr.IsAny<CancellationToken>()
+        //         )
+        //         .ReturnsAsync(() => new HttpResponseMessage
+        //         {
+        //             StatusCode = HttpStatusCode.OK,
+        //             Content = new StringContent(assetInfoJson, Encoding.UTF8, "application/json")
+        //         });
+
+        //     var videoBytes = new byte[] { 0x00, 0x00, 0x00, 0x20 };
+        //     _mockHttpMessageHandler.Protected()
+        //         .Setup<Task<HttpResponseMessage>>(
+        //             "SendAsync",
+        //             ItExpr.Is<HttpRequestMessage>(req =>
+        //                 req.Method == HttpMethod.Get &&
+        //                 req.RequestUri!.ToString().Contains($"/assets/{videoAssetId}/video/playback", StringComparison.OrdinalIgnoreCase)),
+        //             ItExpr.IsAny<CancellationToken>()
+        //         )
+        //         .ReturnsAsync(() =>
+        //         {
+        //             var response = new HttpResponseMessage
+        //             {
+        //                 StatusCode = HttpStatusCode.OK,
+        //                 Content = new ByteArrayContent(videoBytes)
+        //             };
+        //             response.Content.Headers.ContentType = new MediaTypeHeaderValue("video/mp4");
+        //             return response;
+        //         });
+
+        //     var client = _factory.CreateClient();
+
+        //     // Act
+        //     var response = await client.GetAsync($"/api/Asset/{videoAssetId}/Asset?assetType=1");
+
+        //     // Assert
+        //     response.EnsureSuccessStatusCode();
+        //     Assert.That(response.Content.Headers.ContentType?.MediaType, Is.EqualTo("video/mp4"));
+        //     var resultBytes = await response.Content.ReadAsByteArrayAsync();
+        //     Assert.That(resultBytes, Is.EqualTo(videoBytes));
+        // }
     }
 }

@@ -4,7 +4,7 @@
 	import * as locale from 'date-fns/locale';
 	import { configStore } from '$lib/stores/config.store';
 	import Icon from './icon.svelte';
-	import { mdiCalendar, mdiMapMarker, mdiAccount, mdiText, mdiImageAlbum } from '@mdi/js';
+	import { mdiCalendar, mdiMapMarker, mdiAccount, mdiText, mdiImageAlbum, mdiTag } from '@mdi/js';
 
 	interface Props {
 		asset: AssetResponseDto;
@@ -13,7 +13,9 @@
 		showPhotoDate: boolean;
 		showImageDesc: boolean;
 		showPeopleDesc: boolean;
+		showTagsDesc: boolean;
 		showAlbumName: boolean;
+		split: boolean;
 	}
 
 	let {
@@ -23,7 +25,9 @@
 		showPhotoDate,
 		showImageDesc,
 		showPeopleDesc,
-		showAlbumName
+		showTagsDesc,
+		showAlbumName,
+		split,
 	}: Props = $props();
 
 	function formatLocation(format: string, city?: string, state?: string, country?: string) {
@@ -63,9 +67,10 @@
 		)
 	);
 	let availablePeople = $derived(asset.people?.filter((x) => x.name));
+	let availableTags = $derived(asset.tags?.filter((x) => x.name));
 </script>
 
-{#if showPhotoDate || showLocation || showImageDesc || showPeopleDesc || showAlbumName}
+{#if showPhotoDate || showLocation || showImageDesc || showPeopleDesc || showTagsDesc || showAlbumName}
 	<div
 		id="imageinfo"
 		class="immichframe_image_metadata absolute bottom-0 right-0 z-100 text-complementary p-3 text-right text-enhanced-small text-crisp
@@ -77,31 +82,37 @@
 		{#if showPhotoDate && formattedDate}
 			<p id="photodate" class="info-item">
 				<Icon path={mdiCalendar} class="info-icon" />
-				{formattedDate}
+				<span class="info-text" class:short-text={split}>{formattedDate}</span>
 			</p>
 		{/if}
 		{#if showImageDesc && desc}
 			<p id="imagedescription" class="info-item">
 				<Icon path={mdiText} class="info-icon" />
-				{desc}
+				<span class="info-text" class:short-text={split}>{desc}</span>
 			</p>
 		{/if}
 		{#if showAlbumName && albums && albums.length > 0}
 			<p id="imagealbums" class="info-item">
 				<Icon path={mdiImageAlbum} />
-				{albums.map((x) => x.albumName).join(', ')}
+				<span class="info-text" class:short-text={split}>{albums.map((x) => x.albumName).join(', ')}</span>
 			</p>
 		{/if}
 		{#if showPeopleDesc && availablePeople && availablePeople.length > 0}
 			<p id="peopledescription" class="info-item">
 				<Icon path={mdiAccount} />
-				{availablePeople.map((x) => x.name).join(', ')}
+				<span class="info-text" class:short-text={split}>{availablePeople.map((x) => x.name).join(', ')}</span>
+			</p>
+		{/if}
+		{#if showTagsDesc && availableTags && availableTags.length > 0}
+			<p id="tagsdescription" class="info-item">
+				<Icon path={mdiTag} />
+				<span class="info-text" class:short-text={split}>{availableTags.map((x) => x.name).join(', ')}</span>
 			</p>
 		{/if}
 		{#if showLocation && location}
 			<p id="imagelocation" class="info-item">
 				<Icon path={mdiMapMarker} />
-				{location}
+				<span class="info-text" class:short-text={split}>{location}</span>
 			</p>
 		{/if}
 	</div>
@@ -117,5 +128,14 @@
 		font-size: 1.1rem;
 		line-height: 1.3;
 		letter-spacing: 0.02em;
+	}
+	.info-text {
+		max-width: 40vw;
+		overflow: hidden;
+		text-wrap: nowrap;
+		text-overflow: ellipsis;
+	}
+	.short-text {
+		max-width: 22vw;
 	}
 </style>

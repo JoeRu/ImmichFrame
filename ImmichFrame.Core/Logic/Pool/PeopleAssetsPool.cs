@@ -9,11 +9,17 @@ public class PersonAssetsPool(IApiCache apiCache, ImmichApi immichApi, IAccountS
     {
         var personAssets = new List<AssetResponseDto>();
 
-        foreach (var personId in accountSettings.People)
+        var people = accountSettings.People;
+        if (people == null)
+        {
+            return personAssets;
+        }
+
+        foreach (var personId in people)
         {
             int page = 1;
             int batchSize = 1000;
-            int total;
+            long total;
             do
             {
                 var metadataBody = new MetadataSearchDto
@@ -21,11 +27,18 @@ public class PersonAssetsPool(IApiCache apiCache, ImmichApi immichApi, IAccountS
                     Page = page,
                     Size = batchSize,
                     PersonIds = [personId],
-                    Type = accountSettings.ShowVideosOnly ? AssetTypeEnum.VIDEO : 
-                           accountSettings.ShowVideos ? null : AssetTypeEnum.IMAGE,
                     WithExif = true,
                     WithPeople = true
                 };
+
+                if (accountSettings.ShowVideosOnly)
+                {
+                    metadataBody.Type = AssetTypeEnum.VIDEO;
+                }
+                else if (!accountSettings.ShowVideos)
+                {
+                    metadataBody.Type = AssetTypeEnum.IMAGE;
+                }
 
                 var personInfo = await immichApi.SearchAssetsAsync(metadataBody, ct);
 

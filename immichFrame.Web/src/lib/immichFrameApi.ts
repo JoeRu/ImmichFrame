@@ -9,7 +9,7 @@ import * as Oazapfts from "@oazapfts/runtime";
 import * as QS from "@oazapfts/runtime/query";
 export const defaults: Oazapfts.Defaults<Oazapfts.CustomHeaders> = {
     headers: {},
-    baseUrl: "/",
+    baseUrl: "/"
 };
 const oazapfts = Oazapfts.runtime(defaults);
 export const servers = {};
@@ -52,24 +52,9 @@ export type UserResponseDto = {
         [key: string]: any | null;
     } | null;
 };
-export type SourceType = 0 | 1 | 2;
-export type AssetFaceWithoutPersonResponseDto = {
-    boundingBoxX1?: number;
-    boundingBoxX2?: number;
-    boundingBoxY1?: number;
-    boundingBoxY2?: number;
-    id: string;
-    imageHeight?: number;
-    imageWidth?: number;
-    sourceType?: SourceType;
-    additionalProperties?: {
-        [key: string]: any | null;
-    } | null;
-};
-export type PersonWithFacesResponseDto = {
+export type PersonResponseDto = {
     birthDate?: string | null;
     color?: string | null;
-    faces: AssetFaceWithoutPersonResponseDto[];
     id: string;
     isFavorite?: boolean | null;
     isHidden?: boolean;
@@ -105,16 +90,17 @@ export type AssetVisibility = 0 | 1 | 2 | 3;
 export type AssetResponseDto = {
     immichServerUrl?: string | null;
     checksum: string;
-    deviceAssetId: string;
-    deviceId: string;
+    createdAt: string;
     duplicateId?: string | null;
-    duration: string;
+    duration?: number | null;
     exifInfo?: ExifResponseDto;
     fileCreatedAt: string;
     fileModifiedAt: string;
     hasMetadata?: boolean;
+    height?: number | null;
     id: string;
     isArchived?: boolean;
+    isEdited?: boolean;
     isFavorite?: boolean;
     isOffline?: boolean;
     isTrashed?: boolean;
@@ -126,23 +112,45 @@ export type AssetResponseDto = {
     originalPath: string;
     owner?: UserResponseDto;
     ownerId: string;
-    people?: PersonWithFacesResponseDto[] | null;
+    people?: PersonResponseDto[] | null;
     resized?: boolean | null;
     stack?: AssetStackResponseDto;
     tags?: TagResponseDto[] | null;
     thumbhash?: string | null;
     "type": AssetTypeEnum;
-    unassignedFaces?: AssetFaceWithoutPersonResponseDto[] | null;
     updatedAt: string;
     visibility: AssetVisibility;
+    width?: number | null;
     additionalProperties?: {
         [key: string]: any | null;
     } | null;
 };
-export type AlbumUserRole = 0 | 1;
+export type SourceType = 0 | 1 | 2;
+export type AssetFaceResponseDto = {
+    boundingBoxX1?: number;
+    boundingBoxX2?: number;
+    boundingBoxY1?: number;
+    boundingBoxY2?: number;
+    id: string;
+    imageHeight?: number;
+    imageWidth?: number;
+    person?: PersonResponseDto;
+    sourceType?: SourceType;
+    additionalProperties?: {
+        [key: string]: any | null;
+    } | null;
+};
+export type AlbumUserRole = 0 | 1 | 2;
 export type AlbumUserResponseDto = {
     role: AlbumUserRole;
     user: UserResponseDto;
+    additionalProperties?: {
+        [key: string]: any | null;
+    } | null;
+};
+export type ContributorCountResponseDto = {
+    assetCount?: number;
+    userId: string;
     additionalProperties?: {
         [key: string]: any | null;
     } | null;
@@ -153,7 +161,7 @@ export type AlbumResponseDto = {
     albumThumbnailAssetId?: string | null;
     albumUsers: AlbumUserResponseDto[];
     assetCount?: number;
-    assets: AssetResponseDto[];
+    contributorCounts?: ContributorCountResponseDto[] | null;
     createdAt: string;
     description: string;
     endDate?: string | null;
@@ -162,14 +170,20 @@ export type AlbumResponseDto = {
     isActivityEnabled?: boolean;
     lastModifiedAssetTimestamp?: string | null;
     order?: AssetOrder;
-    owner: UserResponseDto;
-    ownerId: string;
     shared?: boolean;
     startDate?: string | null;
     updatedAt: string;
     additionalProperties?: {
         [key: string]: any | null;
     } | null;
+};
+export type ProblemDetails = {
+    "type"?: string | null;
+    title?: string | null;
+    status?: number | null;
+    detail?: string | null;
+    instance?: string | null;
+    [key: string]: any;
 };
 export type ImageResponse = {
     randomImageBase64: string | null;
@@ -198,6 +212,7 @@ export type ClientSettingsDto = {
     photoDateFormat?: string | null;
     showImageDesc?: boolean;
     showPeopleDesc?: boolean;
+    showTagsDesc?: boolean;
     showAlbumName?: boolean;
     showImageLocation?: boolean;
     imageLocationFormat?: string | null;
@@ -210,6 +225,7 @@ export type ClientSettingsDto = {
     imageZoom?: boolean;
     imagePan?: boolean;
     imageFill?: boolean;
+    playAudio?: boolean;
     layout?: string | null;
     language?: string | null;
 };
@@ -221,7 +237,7 @@ export type IWeather = {
     description?: string | null;
     iconId?: string | null;
 };
-export function getAsset({ clientIdentifier }: {
+export function getAssets({ clientIdentifier }: {
     clientIdentifier?: string;
 } = {}, opts?: Oazapfts.RequestOpts) {
     return oazapfts.fetchJson<{
@@ -240,6 +256,18 @@ export function getAssetInfo(id: string, { clientIdentifier }: {
         status: 200;
         data: AssetResponseDto;
     }>(`/api/Asset/${encodeURIComponent(id)}/AssetInfo${QS.query(QS.explode({
+        clientIdentifier
+    }))}`, {
+        ...opts
+    });
+}
+export function getAssetFaces(id: string, { clientIdentifier }: {
+    clientIdentifier?: string;
+} = {}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.fetchJson<{
+        status: 200;
+        data: AssetFaceResponseDto[];
+    }>(`/api/Asset/${encodeURIComponent(id)}/AssetFaces${QS.query(QS.explode({
         clientIdentifier
     }))}`, {
         ...opts
@@ -265,6 +293,26 @@ export function getImage(id: string, { clientIdentifier }: {
         data: Blob;
     }>(`/api/Asset/${encodeURIComponent(id)}/Image${QS.query(QS.explode({
         clientIdentifier
+    }))}`, {
+        ...opts
+    });
+}
+export function getAsset(id: string, { clientIdentifier, assetType }: {
+    clientIdentifier?: string;
+    assetType?: AssetTypeEnum;
+} = {}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    } | {
+        status: 206;
+        data: Blob;
+    } | {
+        status: 416;
+        data: ProblemDetails;
+    }>(`/api/Asset/${encodeURIComponent(id)}/Asset${QS.query(QS.explode({
+        clientIdentifier,
+        assetType
     }))}`, {
         ...opts
     });

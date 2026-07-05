@@ -1,15 +1,18 @@
-﻿namespace ImmichFrame.Core.Interfaces
+namespace ImmichFrame.Core.Interfaces
 {
     public interface IServerSettings
     {
         public IEnumerable<IAccountSettings> Accounts { get; }
         public IGeneralSettings GeneralSettings { get; }
+
+        public void Validate();
     }
 
     public interface IAccountSettings
     {
         public string ImmichServerUrl { get; }
         public string ApiKey { get; }
+        public string? ApiKeyFile { get; }
         public bool ShowMemories { get; }
         public bool ShowFavorites { get; }
         public bool ShowArchived { get; }
@@ -21,7 +24,10 @@
         public List<Guid> Albums { get; }
         public List<Guid> ExcludedAlbums { get; }
         public List<Guid> People { get; }
+        public List<string> Tags { get; }
         public int? Rating { get; }
+
+        public void ValidateAndInitialize();
     }
 
     public interface IGeneralSettings
@@ -45,6 +51,7 @@
         public string? PhotoDateFormat { get; }
         public bool ShowImageDesc { get; }
         public bool ShowPeopleDesc { get; }
+        public bool ShowTagsDesc { get; }
         public bool ShowAlbumName { get; }
         public bool ShowImageLocation { get; }
         public string? ImageLocationFormat { get; }
@@ -57,8 +64,11 @@
         public bool ImageZoom { get; }
         public bool ImagePan { get; }
         public bool ImageFill { get; }
+        public bool PlayAudio { get; }
         public string Layout { get; }
-        public string Language { get; }
         public int ChronologicalImagesCount { get; }
+        public string Language { get; }
+
+        public void Validate();
     }
 }
