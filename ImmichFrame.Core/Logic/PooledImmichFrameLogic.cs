@@ -7,7 +7,7 @@ using ImmichFrame.Core.Models;
 
 namespace ImmichFrame.Core.Logic;
 
-public class PooledImmichFrameLogic : IAccountImmichFrameLogic
+public class PooledImmichFrameLogic : IAccountImmichFrameLogic, IDisposable
 {
     private readonly IGeneralSettings _generalSettings;
     private readonly IApiCache _apiCache;
@@ -211,4 +211,6 @@ public class PooledImmichFrameLogic : IAccountImmichFrameLogic
         await WebhookHelper.SendWebhookNotification(notification, _generalSettings.Webhook);
 
     public override string ToString() => $"Account Pool [{_immichApi.BaseUrl}]";
+
+    public void Dispose() => (_apiCache as IDisposable)?.Dispose();
 }

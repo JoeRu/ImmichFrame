@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ImmichFrame.Core.Logic;
 
-public class MultiImmichFrameLogicDelegate : IImmichFrameLogic
+public class MultiImmichFrameLogicDelegate : IImmichFrameLogic, IDisposable
 {
     private readonly FrozenDictionary<IAccountSettings, IAccountImmichFrameLogic> _accountToDelegate;
     private readonly IServerSettings _serverSettings;
@@ -19,17 +19,16 @@ public class MultiImmichFrameLogicDelegate : IImmichFrameLogic
 
     public MultiImmichFrameLogicDelegate(IServerSettings serverSettings,
         Func<IAccountSettings, IAccountImmichFrameLogic> logicFactory, ILogger<MultiImmichFrameLogicDelegate> logger,
-        IAccountSelectionStrategy accountSelectionStrategy, IAssetAccountTracker tracker)
+        Func<IList<IAccountImmichFrameLogic>, IAccountSelectionStrategy> strategyFactory, IAssetAccountTracker tracker)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _accountSelectionStrategy = accountSelectionStrategy;
         _tracker = tracker;
         _serverSettings = serverSettings;
         _accountToDelegate = serverSettings.Accounts.ToFrozenDictionary(
             keySelector: a => a,
             elementSelector: logicFactory
         );
-        _accountSelectionStrategy.Initialize(_accountToDelegate.Values);
+        _accountSelectionStrategy = strategyFactory(_accountToDelegate.Values.ToList());
     }
 
     public async Task<AssetResponseDto?> GetNextAsset() => (await _accountSelectionStrategy.GetNextAsset())?.ToAsset();
@@ -124,6 +123,14 @@ public class MultiImmichFrameLogicDelegate : IImmichFrameLogic
 
     public Task SendWebhookNotification(IWebhookNotification notification) =>
         WebhookHelper.SendWebhookNotification(notification, _serverSettings.GeneralSettings.Webhook);
+
+    public void Dispose()
+    {
+        foreach (var accountLogic in _accountToDelegate.Values)
+        {
+            (accountLogic as IDisposable)?.Dispose();
+        }
+    }
 }
 
 public static class AccountAndAssetExtensions

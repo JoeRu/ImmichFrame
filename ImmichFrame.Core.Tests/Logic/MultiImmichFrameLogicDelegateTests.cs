@@ -41,7 +41,7 @@ public class MultiImmichFrameLogicDelegateTests
             serverSettings.Object,
             _ => accountLogic.Object,
             Mock.Of<ILogger<MultiImmichFrameLogicDelegate>>(),
-            selectionStrategy.Object,
+            _ => selectionStrategy.Object,
             tracker.Object);
 
         var result = (await sut.GetAssets()).ToList();
@@ -200,7 +200,7 @@ public class MultiImmichFrameLogicDelegateTests
                     ? accountB.Object
                     : accountC.Object,
             Mock.Of<ILogger<MultiImmichFrameLogicDelegate>>(),
-            selectionStrategy.Object,
+            _ => selectionStrategy.Object,
             tracker.Object);
 
         var result = await sut.GetAsset(assetId);
@@ -290,7 +290,7 @@ public class MultiImmichFrameLogicDelegateTests
             serverSettings.Object,
             settings => ReferenceEquals(settings, accountSettingsA.Object) ? accountA.Object : accountB.Object,
             (logger ?? new Mock<ILogger<MultiImmichFrameLogicDelegate>>()).Object,
-            selectionStrategy.Object,
+            _ => selectionStrategy.Object,
             tracker.Object);
     }
 }

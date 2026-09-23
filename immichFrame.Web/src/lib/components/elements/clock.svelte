@@ -60,18 +60,18 @@
 
 <div
 	id="clock"
-	class="fixed bottom-0 left-0 z-10 text-center text-complementary text-shadow-md bg-black/8 rounded-tr-lg
-	{$configStore.style == 'solid' ? 'bg-secondary rounded-tr-2xl' : ''}
-	{$configStore.style == 'transition' ? 'bg-gradient-to-r from-secondary from-0% pr-10' : ''}
+	class="fixed bottom-0 left-0 z-10 text-center text-frame-primary
+	{$configStore.style == 'solid' ? 'bg-frame-secondary rounded-tr-2xl' : ''}
+	{$configStore.style == 'transition' ? 'bg-linear-to-r from-frame-secondary from-0% pr-10' : ''}
 	{$configStore.style == 'blur' ? 'backdrop-blur-lg rounded-tr-2xl' : ''}	
 	drop-shadow-2xl p-3"
 >
-	<p id="clockdate" class="mt-2 text-sm sm:text-sm md:text-md lg:text-xl font-normal text-shadow-sm">
+	<p id="clockdate" class="mt-2 text-sm sm:text-sm md:text-md lg:text-xl font-thin text-shadow-sm">
 		{formattedDate()}
 	</p>
 	<p
 		id="clocktime"
-		class="mt-2 text-4xl sm:text-4xl md:text-6xl lg:text-8xl font-bold text-shadow-md"
+		class="mt-2 text-4xl sm:text-4xl md:text-6xl lg:text-8xl font-bold text-shadow-lg"
 	>
 		{timePortion()}
 	</p>

@@ -31,7 +31,7 @@
 	}: Props = $props();
 
 	function formatLocation(format: string, city?: string, state?: string, country?: string) {
-		const locationParts: Array<string> = new Array();
+		const locationParts: Array<string> = [];
 
 		format.split(',').forEach((part) => {
 			const trimmedPart = part.trim().toLowerCase();
@@ -73,11 +73,10 @@
 {#if showPhotoDate || showLocation || showImageDesc || showPeopleDesc || showTagsDesc || showAlbumName}
 	<div
 		id="imageinfo"
-		class="immichframe_image_metadata absolute bottom-0 right-0 z-100 text-complementary p-3 text-right text-enhanced-small text-crisp
-		{$configStore.style == 'solid' ? 'bg-secondary rounded-tl-2xl' : ''}
-		{$configStore.style == 'transition' ? 'bg-gradient-to-l from-secondary from-0% pl-10' : ''}
-		{$configStore.style == 'blur' ? 'backdrop-blur-lg rounded-tl-2xl' : ''}
-		{!['solid', 'transition', 'blur'].includes($configStore.style) ? 'bg-black/35 border border-white/20 rounded-tl-lg' : ''}"
+		class="immichframe_image_metadata absolute bottom-0 right-0 z-100 text-frame-primary p-1 text-right
+		{$configStore.style == 'solid' ? 'bg-frame-secondary rounded-tl-2xl' : ''}
+		{$configStore.style == 'transition' ? 'bg-linear-to-l from-frame-secondary from-0% pl-10' : ''}
+		{$configStore.style == 'blur' ? 'backdrop-blur-lg rounded-tl-2xl' : ''}	"
 	>
 		{#if showPhotoDate && formattedDate}
 			<p id="photodate" class="info-item">
@@ -123,11 +122,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		margin: 0.3rem 0.5rem;
-		font-weight: 600;
-		font-size: 1.1rem;
-		line-height: 1.3;
-		letter-spacing: 0.02em;
+		margin: 0.2rem 0.5rem;
 	}
 	.info-text {
 		max-width: 40vw;
