@@ -241,8 +241,8 @@
 			<video
 				bind:this={videoElement}
 				class="{imageFill
-					? 'w-screen max-h-screen h-dvh-safe object-cover'
-					: 'max-h-screen h-dvh-safe max-w-full object-contain'} w-full h-full"
+					? 'w-screen max-h-screen h-dvh-safe object-cover w-full h-full'
+					: 'max-h-screen h-dvh-safe max-w-full object-contain'}"
 				src={asset[0]}
 				autoplay={!playAudio}
 				muted={!playAudio}
@@ -270,8 +270,8 @@
 		{:else}
 			<img
 				class="{imageFill
-					? 'w-screen max-h-screen h-dvh-safe object-cover'
-					: 'max-h-screen h-dvh-safe max-w-full object-contain'} w-full h-full"
+					? 'w-screen max-h-screen h-dvh-safe object-cover w-full h-full'
+					: 'max-h-screen h-dvh-safe max-w-full object-contain'}"
 				src={asset[0]}
 				alt="data"
 				onerror={() => {
